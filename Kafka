@@ -1,54 +1,359 @@
-## Copilot Agent Task: Analyse EhCache RMI Usage (Read-Only — Do NOT modify any files)
+Perfect — that's exactly what I needed. I'll use `#file:` references as the primary mechanism (cleaner, lets Copilot read the file directly) with a fallback note to use full path if the file isn't open.
 
-### Goal
-Scan the entire codebase and produce a structured analysis of how EhCache with RMI 
-replication is currently used. Do not suggest fixes or write any code yet.
+Now let me write all 5 prompts. Here they are:
 
-### What to look for
+---
 
-#### 1. Configuration files (check all of these patterns)
-- Any `ehcache.xml` or `ehcache*.xml` files — note location and every <cache> block inside
-- Any `.properties` or `.yml`/`.yaml` files referencing ehcache, RMI, or replication
-- Any `@Bean` methods returning `CacheManager`, `EhCacheManagerFactoryBean`, 
-  or `net.sf.ehcache.*` types
-- Any XML Spring context files (`applicationContext*.xml`) referencing ehcache beans
+## Phase 1 — Analyse
 
-#### 2. Plain Java wiring (non-Spring)
-- Any class that calls `CacheManager.create()` or `CacheManager.getInstance()` directly
-- Any class implementing `CacheEventListener` or extending `CacheEventListenerAdapter`
-- Any use of `RMICacheReplicatorFactory`, `RMIBootstrapCacheLoaderFactory`, 
-  or `RMIAsynchronousCacheReplicator`
-- Any class that calls `cache.put()`, `cache.remove()`, `cache.get()` directly 
-  on an `net.sf.ehcache.Cache` object (not via Spring abstraction)
+```
+## Task: Analyse EhCache RMI Integration — Read Only, Do NOT modify any files
 
-#### 3. For each cache found, extract
+You are helping migrate an EhCache RMI-based cache sync to Kafka.
+Before anything else, we need a precise understanding of the current setup.
+
+### Anchor Files (start here, do not scan src/ broadly)
+- EhCache config : #file:src/main/resources/ehcache.xml
+- Custom CacheManager : #file:src/main/java/<path>/CacheManager.java
+
+### Step 1 — Parse ehcache.xml
+From the ehcache.xml file extract for each <cache> block:
 - Cache name
-- Is it configured in XML or Java?
-- Is RMI replication enabled? (look for replicatePuts, replicateRemovals etc.)
-- What type of data does it hold? (check usage sites — is it a token, config, user data?)
-- Where is it written to (put/replace)?
-- Where is it read from (get)?
-- Is there any TTL / expiry configured?
+- RMI replication enabled? (check for RMICacheReplicatorFactory in cacheEventListenerFactory)
+- replicatePuts / replicateRemovals / replicateUpdates values if present
+- TTL (timeToLiveSeconds / timeToIdleSeconds)
+- Any bootstrapCacheLoaderFactory present?
 
-### Output format
-Respond ONLY in this structure — one block per cache found:
+### Step 2 — Analyse CacheManager.java
+From the custom CacheManager class:
+- Identify all inner classes that implement CacheEventListener or extend 
+  CacheEventListenerAdapter
+- For each inner class, identify which callback methods are implemented
+  (notifyElementPut, notifyElementUpdated, notifyElementRemoved, etc.)
+- What does each callback do? (e.g. pushes value, calls reload, fires event)
+- How is net.sf.ehcache.CacheManager used as a property?
+  (how is it initialised, which caches does it load?)
+- List all public methods exposed by the custom CacheManager
+  (these are the API surface the rest of the app uses)
+
+### Step 3 — Trace callers of CacheManager.java
+- Find all classes in the project that import or reference the custom CacheManager
+- For each caller class, identify:
+  - Which CacheManager method they call
+  - Which cache name they target (if determinable)
+  - Whether they are doing a write (put/update) or read (get)
+
+### Output Format — respond strictly in this structure, one block per cache:
 
 ---
-CACHE: <cache name>
-CONFIG LOCATION: <file and line>
-WIRING STYLE: Spring Bean | Plain Java | XML only
-RMI REPLICATION: Yes | No | Unknown
-DATA TYPE: <what it stores, inferred from usage>
-WRITE SITES: <class#method, class#method, ...>
-READ SITES: <class#method, class#method, ...>
+CACHE: <name from ehcache.xml>
+RMI REPLICATION: Yes | No
+RMI CONFIG: replicatePuts=? replicateRemovals=? replicateUpdates=?
 TTL: <value or Not Set>
+LISTENER CLASS: <inner class name inside CacheManager.java>
+LISTENER CALLBACKS: <list of implemented methods and what they do>
+DATA TYPE: <inferred from caller usage>
+WRITE CALLERS: <ClassName#method, ...>
+READ CALLERS: <ClassName#method, ...>
 SUGGESTED KAFKA STRATEGY: Invalidate-only | Push full value | Needs discussion
+REASON FOR STRATEGY: <one line>
 ---
 
-If you cannot determine something, write "Unknown — needs manual review" 
-rather than guessing.
+### Rules
+- If something cannot be determined from the provided files, write:
+  "Unknown — needs manual review" — do not guess
+- Process a maximum of 5 caches in one response
+- If more than 5 caches exist, stop and say:
+  "X more caches found — re-run this prompt to continue from cache: <name>"
+- Do NOT suggest any changes or write any code in this phase
+```
 
-### Scope limit
-Only scan files under `src/`. Ignore `test/` for now.
-Process a maximum of 5 caches in this response. 
-If more exist, stop and say "X more caches found — run prompt again to continue."
+---
+
+## Phase 2 — Migration Plan
+
+```
+## Task: Produce Migration Plan — No code changes yet
+
+Using the cache analysis output from Phase 1, produce a structured migration 
+plan for replacing EhCache RMI with Kafka-based cache synchronisation.
+
+### Input
+Paste the Phase 1 output blocks here:
+<PASTE PHASE 1 OUTPUT>
+
+### What to produce
+
+#### 1. Kafka Topic Design
+For each cache, define:
+- Topic name (use convention: app-cache-sync-<cachename>)
+- Message strategy: Invalidate-only | Push full value
+- Message key: what should the Kafka record key be?
+- Message value: what should the payload look like? (describe fields)
+- Consumer group id: one per application (all instances share same group? 
+  No — each instance needs its own group id so ALL instances receive the event.
+  Flag this explicitly in the plan.)
+
+#### 2. Impacted Files
+List every file that will need to change, in this format:
+FILE: <path>
+CHANGE TYPE: Modify | Delete | Replace
+REASON: <one line>
+
+#### 3. New Files to Create
+List every new file that needs to be created:
+FILE: <suggested path>
+PURPOSE: <one line>
+
+#### 4. Dependency Changes
+List changes needed in build.gradle:
+- Dependencies to ADD (spring-kafka, kafka-clients etc. with suggested versions 
+  compatible with Spring Boot 2.x)
+- Dependencies to REMOVE (ehcache, ehcache-jgroups or RMI related)
+- Any Spring Boot auto-configuration to enable
+
+#### 5. Configuration Changes
+List new properties needed in application.yml / application.properties:
+- Kafka bootstrap servers
+- Producer config
+- Consumer config
+- Any cache-specific config
+
+#### 6. Migration Sequence
+Recommend the order in which to make changes to avoid breaking the app 
+mid-migration. Number each step.
+
+### Rules
+- Do not write any implementation code in this phase
+- If the Phase 1 input is incomplete (some caches marked "Needs discussion"),
+  flag them separately at the end under: "CACHES NEEDING STRATEGY DECISION"
+- Keep each section concise — bullet points preferred over prose
+```
+
+---
+
+## Phase 3 — Infra & Config
+
+```
+## Task: Add Kafka Infrastructure and Configuration — No business logic yet
+
+We are migrating from EhCache RMI to Kafka cache sync.
+The migration plan from Phase 2 has been approved.
+
+### Reference Files
+- Build file     : #file:build.gradle
+- App config     : #file:src/main/resources/application.yml
+  (or application.properties — use whichever is present)
+
+### Input
+Paste the Phase 2 dependency and configuration sections here:
+<PASTE PHASE 2 DEPENDENCY + CONFIGURATION OUTPUT>
+
+### What to implement in this phase
+
+#### 1. build.gradle changes
+- Add spring-kafka dependency (Spring Boot 2.x compatible version)
+- Add kafka-clients if not pulled in transitively
+- Remove or comment out ehcache RMI-related dependencies
+  (do NOT remove core ehcache yet — that happens in Phase 5)
+- Do not change any other dependencies
+
+#### 2. application.yml changes
+Add a new section for Kafka:
+- spring.kafka.bootstrap-servers (use placeholder: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092})
+- Producer config: key-serializer, value-serializer (use StringSerializer for both initially)
+- Consumer config: key-deserializer, value-deserializer, auto-offset-reset: earliest
+- For each cache topic, add a property for the topic name so it is not hardcoded
+  e.g. cache.sync.topic.<cachename>=app-cache-sync-<cachename>
+
+#### 3. New KafkaConfig.java
+Create src/main/java/<base-package>/config/KafkaConfig.java
+This class should:
+- Be annotated with @Configuration
+- Define a ProducerFactory<String, String> bean
+- Define a KafkaTemplate<String, String> bean
+- Define a ConcurrentKafkaListenerContainerFactory<String, String> bean
+- Define a ConsumerFactory<String, String> bean
+- Use a unique consumer group per instance using:
+  spring.kafka.consumer.group-id=${spring.application.name}-${random.uuid}
+  (this ensures ALL instances receive every cache sync event — 
+   explain this with a comment in the code)
+
+#### 4. New CacheSyncMessage.java
+Create src/main/java/<base-package>/cache/CacheSyncMessage.java
+This is the DTO for all cache sync Kafka messages:
+Fields:
+- String cacheName
+- String action  (enum-style string: PUT | REMOVE | INVALIDATE | RELOAD)
+- String key     (cache key, nullable)
+- String value   (serialised cache value, nullable — only for Push strategy)
+- long timestamp
+Include: getters, no-args constructor, all-args constructor
+Use Jackson annotations: @JsonProperty where needed
+Do NOT use Lombok (unless it is already used in the project — 
+  check #file:build.gradle before deciding)
+
+### Rules
+- Only create or modify the files listed above
+- Do not touch CacheManager.java or any business logic class yet
+- If build.gradle or application.yml already has a kafka section, 
+  flag it and ask before overwriting
+- After completing, list every file modified or created with a one-line summary
+```
+
+---
+
+## Phase 4 — Core Migration (one cache at a time)
+
+```
+## Task: Migrate ONE cache from EhCache RMI to Kafka — implement changes
+
+We are replacing EhCache RMI sync with Kafka for cache synchronisation.
+Infrastructure is already in place (KafkaConfig.java, CacheSyncMessage.java, 
+build.gradle, application.yml all updated in Phase 3).
+
+### Reference Files
+- Custom CacheManager : #file:src/main/java/<path>/CacheManager.java
+- Kafka config        : #file:src/main/java/<path>/config/KafkaConfig.java
+- CacheSyncMessage    : #file:src/main/java/<path>/cache/CacheSyncMessage.java
+- EhCache config      : #file:src/main/resources/ehcache.xml
+
+### Target cache for this run
+CACHE NAME: <fill in one cache name from Phase 1 output>
+KAFKA STRATEGY: <Invalidate-only | Push full value>  (from Phase 1 output)
+TOPIC NAME: <from Phase 2 output>
+
+### What to implement
+
+#### 1. Producer side — on cache write
+In CacheManager.java:
+- Inject KafkaTemplate<String, String> (use constructor injection)
+- Find the write path for the target cache (put / update / remove methods)
+- After the existing EhCache write, publish a CacheSyncMessage to the topic:
+  - For Push strategy: populate cacheName, action=PUT/REMOVE, key, value 
+    (serialise value to JSON using ObjectMapper)
+  - For Invalidate-only strategy: populate cacheName, action=RELOAD or INVALIDATE, 
+    key only — no value field
+- Wrap Kafka publish in try-catch — a Kafka failure must NOT break the cache write
+  Log the error but allow the operation to continue
+- Do NOT remove the existing EhCache put/remove call yet — 
+  both should run in parallel during migration
+
+#### 2. Consumer side — on receiving sync event
+Create a new class: 
+src/main/java/<base-package>/cache/CacheSyncConsumer.java
+- Annotate with @Component
+- Inject the custom CacheManager
+- Add a @KafkaListener method for the target cache topic
+- In the listener:
+  - Deserialise the incoming message to CacheSyncMessage using ObjectMapper
+  - Check the action field:
+    - PUT → call the appropriate CacheManager method to update local cache with 
+      the provided value (Push strategy only)
+    - RELOAD / INVALIDATE → call the appropriate CacheManager method to 
+      evict and reload from DB
+    - REMOVE → evict the key from local cache
+  - Skip processing if the message originates from this instance 
+    (add instanceId field to CacheSyncMessage and compare — 
+    generate instanceId as a @Value injected UUID at startup)
+  - Wrap in try-catch — a bad message must not crash the consumer
+
+#### 3. Inner CacheEventListener for this cache
+- Find the inner listener class inside CacheManager.java 
+  that corresponds to the target cache
+- Comment it out (do NOT delete yet) with a note:
+  // MIGRATION: replaced by Kafka producer in <date> — remove after validation
+
+### Rules
+- Only modify code related to the ONE named cache above
+- Do not touch other caches or their listener classes
+- Do not remove ehcache.xml config for this cache yet
+- After completing, print a checklist:
+  [ ] Producer publishes on write
+  [ ] Consumer receives and applies update
+  [ ] instanceId self-message guard in place
+  [ ] Kafka failure does not break cache write
+  [ ] Old RMI listener commented out (not deleted)
+  
+### Repeat instruction
+This prompt should be re-run once per cache, changing only the 
+TARGET CACHE FOR THIS RUN section each time.
+```
+
+---
+
+## Phase 5 — Cleanup & Validation
+
+```
+## Task: Remove EhCache RMI — final cleanup after all caches migrated
+
+All caches have been migrated to Kafka in Phase 4 and validated in testing.
+This phase removes all EhCache RMI infrastructure cleanly.
+
+### Reference Files
+- Custom CacheManager : #file:src/main/java/<path>/CacheManager.java
+- EhCache config      : #file:src/main/resources/ehcache.xml
+- Build file          : #file:build.gradle
+
+### Step 1 — CacheManager.java cleanup
+- Delete all inner classes that implement CacheEventListener 
+  (all should already be commented out from Phase 4 — confirm before deleting)
+- Remove the net.sf.ehcache.CacheManager property and all references to it
+- Remove any RMI-related initialisation code
+- Keep all public methods intact — only remove EhCache internals
+- If any public method still delegates to ehcache directly, 
+  flag it and do not delete — ask for guidance
+
+### Step 2 — ehcache.xml cleanup
+- Remove all <cacheEventListenerFactory> blocks referencing RMICacheReplicatorFactory
+- Remove all <bootstrapCacheLoaderFactory> blocks
+- Remove RMI peer discovery config (<cacheManagerPeerProviderFactory>, 
+  <cacheManagerPeerListenerFactory>)
+- Keep the <cache> definitions themselves — local caching may still be in use
+  unless confirmed otherwise
+
+### Step 3 — build.gradle cleanup
+- Remove ehcache RMI / replication dependencies
+- If core ehcache is no longer referenced anywhere in the code after Step 1,
+  remove it too — scan for any remaining net.sf.ehcache imports before doing so
+- Document what was removed with a comment
+
+### Step 4 — Test coverage check
+Scan the test/ directory for:
+- Any tests that mock or reference the old inner CacheEventListener classes
+- Any tests that reference RMI config or net.sf.ehcache.distribution.*
+- Any tests using ehcache.xml directly via ClassPathResource or similar
+List each one with:
+TEST FILE: <path>
+ISSUE: <what references the old code>
+ACTION NEEDED: Update mock | Delete test | Replace with Kafka consumer test
+
+### Step 5 — Produce a final validation checklist
+Print this checklist for manual sign-off:
+
+KAFKA MIGRATION — FINAL CHECKLIST
+[ ] All cache topics exist in Kafka (verify with kafka-topics --list)
+[ ] All producer publish calls confirmed in logs for each cache
+[ ] All consumer receive calls confirmed in logs for each cache  
+[ ] Self-message guard tested (instance does not re-process its own publish)
+[ ] Kafka consumer failure tested (bad message does not crash instance)
+[ ] Kafka broker down tested (cache write still succeeds, error logged)
+[ ] All EhCache RMI listener classes removed
+[ ] No net.sf.ehcache.distribution.* imports remaining in src/
+[ ] Old tests updated or removed
+[ ] application.yml has no leftover RMI properties
+[ ] Load tested with N instances running simultaneously
+
+### Rules
+- Do not delete anything that is still referenced — flag it instead
+- If any step reveals unexpected EhCache usage not covered in Phase 1, 
+  stop and report it before continuing
+```
+
+---
+
+That's the complete set. A few usage tips:
+
+- **Phase 4 is the only one you'll run multiple times** — once per cache, just swap the cache name and strategy in the placeholder section
+- **Always paste the previous phase's output** into the next prompt's `<PASTE ...>` placeholder — this keeps Copilot in context without re-reading files
+- **If Copilot times out mid-phase**, add `"Continue from where you stopped — do not restart"` at the top of your next message in the same chat session
