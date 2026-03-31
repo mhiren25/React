@@ -1,0 +1,54 @@
+## Copilot Agent Task: Analyse EhCache RMI Usage (Read-Only — Do NOT modify any files)
+
+### Goal
+Scan the entire codebase and produce a structured analysis of how EhCache with RMI 
+replication is currently used. Do not suggest fixes or write any code yet.
+
+### What to look for
+
+#### 1. Configuration files (check all of these patterns)
+- Any `ehcache.xml` or `ehcache*.xml` files — note location and every <cache> block inside
+- Any `.properties` or `.yml`/`.yaml` files referencing ehcache, RMI, or replication
+- Any `@Bean` methods returning `CacheManager`, `EhCacheManagerFactoryBean`, 
+  or `net.sf.ehcache.*` types
+- Any XML Spring context files (`applicationContext*.xml`) referencing ehcache beans
+
+#### 2. Plain Java wiring (non-Spring)
+- Any class that calls `CacheManager.create()` or `CacheManager.getInstance()` directly
+- Any class implementing `CacheEventListener` or extending `CacheEventListenerAdapter`
+- Any use of `RMICacheReplicatorFactory`, `RMIBootstrapCacheLoaderFactory`, 
+  or `RMIAsynchronousCacheReplicator`
+- Any class that calls `cache.put()`, `cache.remove()`, `cache.get()` directly 
+  on an `net.sf.ehcache.Cache` object (not via Spring abstraction)
+
+#### 3. For each cache found, extract
+- Cache name
+- Is it configured in XML or Java?
+- Is RMI replication enabled? (look for replicatePuts, replicateRemovals etc.)
+- What type of data does it hold? (check usage sites — is it a token, config, user data?)
+- Where is it written to (put/replace)?
+- Where is it read from (get)?
+- Is there any TTL / expiry configured?
+
+### Output format
+Respond ONLY in this structure — one block per cache found:
+
+---
+CACHE: <cache name>
+CONFIG LOCATION: <file and line>
+WIRING STYLE: Spring Bean | Plain Java | XML only
+RMI REPLICATION: Yes | No | Unknown
+DATA TYPE: <what it stores, inferred from usage>
+WRITE SITES: <class#method, class#method, ...>
+READ SITES: <class#method, class#method, ...>
+TTL: <value or Not Set>
+SUGGESTED KAFKA STRATEGY: Invalidate-only | Push full value | Needs discussion
+---
+
+If you cannot determine something, write "Unknown — needs manual review" 
+rather than guessing.
+
+### Scope limit
+Only scan files under `src/`. Ignore `test/` for now.
+Process a maximum of 5 caches in this response. 
+If more exist, stop and say "X more caches found — run prompt again to continue."
