@@ -354,6 +354,54 @@ KAFKA MIGRATION — FINAL CHECKLIST
 
 That's the complete set. A few usage tips:
 
+
+Subject: Kafka Broker Setup Request — Cache Synchronisation Topics
+
+Hi [Infra Team],
+
+We are migrating our inter-instance cache synchronisation from EhCache RMI to Kafka and need a Kafka broker set up along with 6 topics created.
+
+Please find the topic details below.
+
+---
+TOPIC NAMES
+---
+1. <topic-name-1>
+2. <topic-name-2>
+3. <topic-name-3>
+4. <topic-name-4>
+5. <topic-name-5>
+6. <topic-name-6>
+
+---
+IMPORTANT — Consumer Group & Partition Requirements
+---
+The primary requirement for these topics is that EVERY running application instance must receive EVERY message published — this is a broadcast pattern, not a load-balanced one.
+
+To achieve this:
+- Each application instance will use a unique consumer group ID at startup (pattern: <app-name>-<random-uuid>)
+- Because of this, the number of partitions does NOT need to match the number of instances
+- We recommend 1 partition per topic for simplicity, as ordering within a cache sync topic is not critical and we do not need parallelism at the consumer side
+- If higher throughput or fault tolerance is needed on the broker side, 3 partitions is also acceptable — our consumer design will handle both
+
+---
+SUGGESTED TOPIC CONFIGURATION
+---
+- Partitions        : 1 (or 3 if preferred for broker resilience)
+- Replication factor: 2 (or as per your standard)
+- Retention         : 1 hour (these are transient sync events, not a log we need to replay)
+- Cleanup policy    : delete
+
+---
+ENVIRONMENTS NEEDED
+---
+Please create the topics in: [ ] Dev  [ ] Staging  [ ] Production
+(we will confirm which environments are needed)
+
+Please let us know if you need any additional details or have questions on the setup.
+
+Thanks,
+[Your Name]
 - **Phase 4 is the only one you'll run multiple times** — once per cache, just swap the cache name and strategy in the placeholder section
 - **Always paste the previous phase's output** into the next prompt's `<PASTE ...>` placeholder — this keeps Copilot in context without re-reading files
 - **If Copilot times out mid-phase**, add `"Continue from where you stopped — do not restart"` at the top of your next message in the same chat session
