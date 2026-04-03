@@ -1,0 +1,29 @@
+Setup (one-time)
+1
+Install GitHub Copilot plugin
+Go to Settings → Plugins → Marketplace, search GitHub Copilot, install and restart. Sign in with your GitHub account when prompted.
+2
+Open Copilot Chat panel
+Click the Copilot icon in the right sidebar, or use Tools → GitHub Copilot → Open Copilot Chat. Dock it wherever is comfortable.
+Full-file review
+3
+Open the file(s) changed in the MR
+In the Git panel (View → Tool Windows → Git), find your MR branch. Double-click the changed file to open it in the editor.
+4
+Select all + send to Copilot Chat
+Press Ctrl+A (or Cmd+A) to select the whole file. Right-click → GitHub Copilot → Open in Chat, or just paste the "Full file" prompt into the chat panel — Copilot automatically has context of the open editor.
+Diff-only review
+5
+Get the git diff
+Open IntelliJ Terminal (Alt+F12) and run: git diff main..HEAD -- path/to/File.java. Copy the output. Alternatively use the Git panel → right-click the MR commit → Show Diff.
+6
+Paste diff into Copilot Chat
+Open Copilot Chat, paste the "Diff only" prompt, then paste your diff where it says [PASTE GIT DIFF HERE]. Hit Enter.
+Power tips
+7
+Use @workspace for multi-file context
+In Copilot Chat, start with @workspace to give Copilot context of the whole project — useful when reviewing code that calls other classes in the repo.
+8
+Save as a reusable .prompt file
+Create .github/copilot-instructions.md or a .prompt file in your repo with the review prompt. Copilot Chat can reference it via #file:your-prompt.md so the whole team uses the same standard.
+Copilot context window is limited (~8k–16k tokens). For very large files, split the review into logical sections or use the diff-only mode.
