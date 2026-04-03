@@ -1,0 +1,10 @@
+Two prompt modes — the widget has both. Use the "Full file" prompt when you want a holistic review of the whole class (great for catching design issues, missing error handling in untouched code, etc.). Use the "Diff only" prompt when you want focused, fast feedback strictly on what changed — paste the git diff output right into it.
+Things I added that you didn't mention:
+
+Security checks (SQL injection, sensitive data in logs, input validation) — these are easy to miss in routine reviews but critical
+Observability — missing MDC/correlation IDs is a very common Java async bug that causes painful prod debugging
+Resilience patterns — no timeout/retry/circuit breaker on external calls is a frequent production incident root cause
+Missing test coverage — the prompt explicitly asks Copilot to call out what should be tested, not just what is
+@workspace tip for multi-file context — essential when the changed class calls other classes in the same repo
+
+IntelliJ tips tab covers setup through to the .github/copilot-instructions.md trick — which is the best way to share this standard with your whole team so everyone's MR reviews use the same bar automatically.
