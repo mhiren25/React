@@ -25,17 +25,15 @@
 <div id="input-screen" class="min-h-screen flex items-center justify-center p-6">
   <div class="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-10">
     <h1 class="text-4xl font-black text-center mb-2">EpicDash</h1>
-    <p class="text-gray-400 text-center mb-8">Powerful Group Dashboard</p>
+    <p class="text-gray-400 text-center mb-8">Group Dashboard</p>
     <div class="space-y-6">
       <div>
-        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">GitLab Group URL</label>
-        <input id="group-url" type="text" placeholder="https://gitlab.com/gitlab-org" 
-               class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-orange-500">
+        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Group URL</label>
+        <input id="group-url" type="text" placeholder="https://gitlab.com/gitlab-org" class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white">
       </div>
       <div>
         <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Personal Access Token</label>
-        <input id="pat" type="password" placeholder="glpat-..." 
-               class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-orange-500">
+        <input id="pat" type="password" placeholder="glpat-..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white">
       </div>
       <button onclick="loadDashboard()" class="gl-btn w-full py-4 rounded-2xl font-bold text-lg">Load Dashboard</button>
     </div>
@@ -43,11 +41,11 @@
   </div>
 </div>
 
-<!-- Loading Screen -->
+<!-- Loading -->
 <div id="loading-screen" class="hidden min-h-screen flex items-center justify-center">
   <div class="text-center">
     <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-    <p class="text-xl font-medium">Loading your group...</p>
+    <p class="text-xl font-medium">Loading group data...</p>
   </div>
 </div>
 
@@ -62,10 +60,9 @@
   </header>
 
   <div class="flex flex-1 overflow-hidden">
-    <!-- Sidebar Filters -->
+    <!-- Sidebar -->
     <aside class="w-80 bg-gray-900 border-r border-gray-800 overflow-y-auto p-6 space-y-8">
-      <input id="search" placeholder="Search issues..." 
-             class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-3" onkeyup="applyFilters()">
+      <input id="search" placeholder="Search issues..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-3" onkeyup="applyFilters()">
 
       <div>
         <p class="text-xs uppercase text-gray-500 mb-3">Status</p>
@@ -88,10 +85,8 @@
 
     <!-- Main Content -->
     <main class="flex-1 overflow-y-auto p-8">
-      <!-- KPIs -->
       <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10"></div>
 
-      <!-- Tabs -->
       <div class="flex gap-10 border-b border-gray-800 mb-8">
         <button onclick="switchTab(0)" class="tab-btn active pb-4" id="tab0">Epic Overview</button>
         <button onclick="switchTab(1)" class="tab-btn pb-4" id="tab1">Issues Tree</button>
@@ -99,16 +94,9 @@
         <button onclick="switchTab(3)" class="tab-btn pb-4" id="tab3">Milestones</button>
       </div>
 
-      <!-- Tab Contents -->
-      <div id="tab-content-0" class="tab-content">
-        <div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
-      </div>
-      <div id="tab-content-1" class="tab-content hidden">
-        <div id="issues-tree" class="space-y-6"></div>
-      </div>
-      <div id="tab-content-2" class="tab-content hidden">
-        <div id="assignee-detail" class="space-y-8"></div>
-      </div>
+      <div id="tab-content-0" class="tab-content"><div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div></div>
+      <div id="tab-content-1" class="tab-content hidden"><div id="issues-tree" class="space-y-6"></div></div>
+      <div id="tab-content-2" class="tab-content hidden"><div id="assignee-detail" class="space-y-8"></div></div>
       <div id="tab-content-3" class="tab-content hidden">
         <div class="flex gap-4 mb-6">
           <div>
@@ -133,7 +121,8 @@
 let appState = {
   pat: "", host: "", groupPath: "",
   epics: [], allIssues: [], filteredIssues: [],
-  activeLabels: new Set(), activeAssignees: new Set()
+  activeLabels: new Set(), activeAssignees: new Set(),
+  groupLabels: []   // ← New: all labels from the group
 };
 
 // ====================== ESTIMATE PARSER ======================
@@ -161,7 +150,7 @@ function fmtTime(seconds) {
 // ====================== API ======================
 async function gitlabFetch(url) {
   const res = await fetch(url, { headers: { "PRIVATE-TOKEN": appState.pat } });
-  if (!res.ok) throw new Error(`GitLab API error: ${res.status}`);
+  if (!res.ok) throw new Error(`GitLab error ${res.status}`);
   return await res.json();
 }
 
@@ -171,7 +160,7 @@ async function loadDashboard() {
   appState.pat = document.getElementById("pat").value.trim();
 
   if (!urlStr || !appState.pat) {
-    document.getElementById("input-error").textContent = "Both fields are required";
+    document.getElementById("input-error").textContent = "Both fields required";
     document.getElementById("input-error").classList.remove("hidden");
     return;
   }
@@ -190,10 +179,17 @@ async function loadDashboard() {
 
   try {
     const base = `${appState.host}/api/v4`;
-    let epics = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics?state=opened&per_page=100`);
+    const encodedPath = encodeURIComponent(appState.groupPath);
 
+    // 1. Fetch all group-level labels (this fixes the "undefined" and missing labels)
+    appState.groupLabels = await gitlabFetch(`${base}/groups/${encodedPath}/labels`);
+
+    // 2. Fetch open epics
+    let epics = await gitlabFetch(`${base}/groups/${encodedPath}/epics?state=opened&per_page=100`);
+
+    // 3. Fetch issues for each epic
     const promises = epics.map(async (epic) => {
-      const issues = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics/${epic.iid}/issues?per_page=100`);
+      const issues = await gitlabFetch(`${base}/groups/${encodedPath}/epics/${epic.iid}/issues?per_page=100`);
       return {
         epic,
         issues: issues.map(i => ({ ...i, estimateSeconds: parseEstimate(i) }))
@@ -218,31 +214,24 @@ async function loadDashboard() {
   }
 }
 
-// ====================== FILTERS ======================
+// ====================== FILTERS (uses group labels) ======================
 function buildFilters() {
-  // Labels
-  const labelMap = new Map();
-  appState.allIssues.forEach(issue => {
-    (issue.labels || []).forEach(l => labelMap.set(l.name, l));
-  });
-
+  // Use group-level labels for the filter sidebar
   let html = "";
-  labelMap.forEach(l => {
+  appState.groupLabels.forEach(l => {
+    if (!l.name) return;
     html += `<div data-label="${l.name}" onclick="toggleLabel(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
       <span class="w-4 h-4 rounded flex-shrink-0" style="background:${l.color || '#666'}"></span>
       ${l.name}
     </div>`;
   });
 
-  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No labels found</p>";
-  document.getElementById("label-count").textContent = `(${labelMap.size})`;
+  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No group labels found</p>";
+  document.getElementById("label-count").textContent = `(${appState.groupLabels.length})`;
 
-  // Assignees
+  // Assignees (from issues)
   const assigneeMap = new Map();
-  appState.allIssues.forEach(issue => {
-    (issue.assignees || []).forEach(a => assigneeMap.set(a.id, a));
-  });
-
+  appState.allIssues.forEach(issue => (issue.assignees || []).forEach(a => assigneeMap.set(a.id, a)));
   html = "";
   assigneeMap.forEach(a => {
     html += `<div data-assignee="${a.id}" onclick="toggleAssignee(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
@@ -250,21 +239,19 @@ function buildFilters() {
       ${a.name || a.username}
     </div>`;
   });
-  document.getElementById("assignees-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No assignees found</p>";
+  document.getElementById("assignees-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No assignees</p>";
 }
 
 function toggleLabel(el) {
   const name = el.dataset.label;
-  if (appState.activeLabels.has(name)) appState.activeLabels.delete(name);
-  else appState.activeLabels.add(name);
+  appState.activeLabels.has(name) ? appState.activeLabels.delete(name) : appState.activeLabels.add(name);
   el.classList.toggle("active");
   applyFilters();
 }
 
 function toggleAssignee(el) {
   const id = parseInt(el.dataset.assignee);
-  if (appState.activeAssignees.has(id)) appState.activeAssignees.delete(id);
-  else appState.activeAssignees.add(id);
+  appState.activeAssignees.has(id) ? appState.activeAssignees.delete(id) : appState.activeAssignees.add(id);
   el.classList.toggle("active");
   applyFilters();
 }
@@ -284,20 +271,10 @@ function applyFilters() {
       const ids = new Set((issue.assignees || []).map(a => a.id));
       if (!Array.from(appState.activeAssignees).some(id => ids.has(id))) return false;
     }
-
     return true;
   });
 
   refreshDashboard();
-}
-
-function clearFilters() {
-  appState.activeLabels.clear();
-  appState.activeAssignees.clear();
-  document.getElementById("search").value = "";
-  document.querySelector('input[name="status"][value="all"]').checked = true;
-  document.querySelectorAll('.filter-item').forEach(el => el.classList.remove('active'));
-  applyFilters();
 }
 
 // ====================== REFRESH ======================
@@ -385,6 +362,7 @@ function renderAssigneeOverview() {
   document.getElementById("assignee-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No assignees in filter</p>";
 }
 
+// ====================== MILESTONES TAB ======================
 function renderMilestones() {
   const groups = new Map();
   appState.filteredIssues.forEach(issue => {
@@ -394,7 +372,6 @@ function renderMilestones() {
     groups.get(key).issues.push(issue);
   });
 
-  // Sort by due date (earliest first)
   const sorted = Array.from(groups.values()).sort((a, b) => {
     const da = a.milestone.due_date ? new Date(a.milestone.due_date) : new Date(9999,11,31);
     const db = b.milestone.due_date ? new Date(b.milestone.due_date) : new Date(9999,11,31);
@@ -403,35 +380,28 @@ function renderMilestones() {
 
   let html = "";
   sorted.forEach(({milestone, issues}) => {
-    const due = milestone.due_date ? milestone.due_date : "No due date";
-    const closed = issues.filter(i => i.state === "closed").length;
-    const pct = issues.length ? Math.round((closed / issues.length) * 100) : 0;
+    const due = milestone.due_date || "No due date";
     html += `
       <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <div class="flex justify-between">
+        <div class="flex justify-between items-start">
           <div>
             <h3 class="font-semibold">${milestone.title}</h3>
             <p class="text-xs text-gray-400">Due: ${due}</p>
           </div>
-          <span class="text-orange-400 mono">${pct}%</span>
         </div>
         <details class="mt-4">
           <summary class="cursor-pointer text-sm text-gray-400 hover:text-white">View ${issues.length} issues</summary>
-          <div class="mt-3 space-y-2 text-sm max-h-60 overflow-auto">`;
-    issues.forEach(i => {
-      html += `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`;
-    });
-    html += `</div></details></div>`;
+          <div class="mt-3 space-y-2 text-sm max-h-60 overflow-auto">
+            ${issues.map(i => `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`).join('')}
+          </div>
+        </details>
+      </div>`;
   });
 
   document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones in current filter</p>";
 }
 
-function applyMilestoneDateFilter() {
-  // Placeholder - you can extend this later with actual date filtering logic
-  renderMilestones();
-}
-
+function applyMilestoneDateFilter() { renderMilestones(); }
 function clearMilestoneDateFilter() {
   document.getElementById("milestone-from").value = "";
   document.getElementById("milestone-to").value = "";
@@ -445,9 +415,7 @@ function switchTab(n) {
   document.querySelectorAll('.tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === n));
 }
 
-function editInput() {
-  location.reload();
-}
+function editInput() { location.reload(); }
 </script>
 </body>
 </html>
