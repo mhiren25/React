@@ -9,7 +9,8 @@
   <style>
     body { font-family: 'Syne', sans-serif; }
     .mono { font-family: 'JetBrains Mono', monospace; }
-    .kpi-card { background: linear-gradient(135deg, #111827, #1F2937); border: 1px solid #374151; }
+    .kpi-card { background: linear-gradient(135deg, #111827, #1F2937); border: 1px solid #374151; transition: all 0.2s ease; }
+    .kpi-card:hover { border-color: #FC6D26; transform: translateY(-2px); }
     .filter-item { transition: all 0.15s ease; cursor: pointer; }
     .filter-item:hover { background: rgba(252,109,38,0.08); }
     .filter-item.active { background: rgba(252,109,38,0.2); border-color: #FC6D26; }
@@ -20,19 +21,21 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
 
-<!-- Input -->
+<!-- Input Screen -->
 <div id="input-screen" class="min-h-screen flex items-center justify-center p-6">
   <div class="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-10">
     <h1 class="text-4xl font-black text-center mb-2">EpicDash</h1>
-    <p class="text-gray-400 text-center mb-8">Group Dashboard for Product Managers</p>
+    <p class="text-gray-400 text-center mb-8">Powerful Group Dashboard</p>
     <div class="space-y-6">
       <div>
-        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Group URL</label>
-        <input id="group-url" type="text" placeholder="https://gitlab.com/gitlab-org" class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white">
+        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">GitLab Group URL</label>
+        <input id="group-url" type="text" placeholder="https://gitlab.com/gitlab-org" 
+               class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-orange-500">
       </div>
       <div>
         <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Personal Access Token</label>
-        <input id="pat" type="password" placeholder="glpat-..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white">
+        <input id="pat" type="password" placeholder="glpat-..." 
+               class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-orange-500">
       </div>
       <button onclick="loadDashboard()" class="gl-btn w-full py-4 rounded-2xl font-bold text-lg">Load Dashboard</button>
     </div>
@@ -40,11 +43,11 @@
   </div>
 </div>
 
-<!-- Loading -->
+<!-- Loading Screen -->
 <div id="loading-screen" class="hidden min-h-screen flex items-center justify-center">
   <div class="text-center">
     <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
-    <p class="text-xl">Loading group data...</p>
+    <p class="text-xl font-medium">Loading your group...</p>
   </div>
 </div>
 
@@ -59,9 +62,10 @@
   </header>
 
   <div class="flex flex-1 overflow-hidden">
-    <!-- Sidebar -->
+    <!-- Sidebar Filters -->
     <aside class="w-80 bg-gray-900 border-r border-gray-800 overflow-y-auto p-6 space-y-8">
-      <input id="search" placeholder="Search issues..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-3" onkeyup="applyFilters()">
+      <input id="search" placeholder="Search issues..." 
+             class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-3" onkeyup="applyFilters()">
 
       <div>
         <p class="text-xs uppercase text-gray-500 mb-3">Status</p>
@@ -72,7 +76,7 @@
       </div>
 
       <div>
-        <p class="text-xs uppercase text-gray-500 mb-3">Labels <span id="label-count-badge" class="text-orange-400"></span></p>
+        <p class="text-xs uppercase text-gray-500 mb-3">Labels <span id="label-count" class="text-orange-400"></span></p>
         <div id="labels-list" class="space-y-1 max-h-72 overflow-y-auto"></div>
       </div>
 
@@ -82,10 +86,12 @@
       </div>
     </aside>
 
-    <!-- Main -->
+    <!-- Main Content -->
     <main class="flex-1 overflow-y-auto p-8">
+      <!-- KPIs -->
       <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10"></div>
 
+      <!-- Tabs -->
       <div class="flex gap-10 border-b border-gray-800 mb-8">
         <button onclick="switchTab(0)" class="tab-btn active pb-4" id="tab0">Epic Overview</button>
         <button onclick="switchTab(1)" class="tab-btn pb-4" id="tab1">Issues Tree</button>
@@ -93,22 +99,28 @@
         <button onclick="switchTab(3)" class="tab-btn pb-4" id="tab3">Milestones</button>
       </div>
 
-      <div id="tab-content-0" class="tab-content"><div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div></div>
-      <div id="tab-content-1" class="tab-content hidden"><div id="issues-tree" class="space-y-6"></div></div>
-      <div id="tab-content-2" class="tab-content hidden"><div id="assignee-detail" class="space-y-8"></div></div>
+      <!-- Tab Contents -->
+      <div id="tab-content-0" class="tab-content">
+        <div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
+      </div>
+      <div id="tab-content-1" class="tab-content hidden">
+        <div id="issues-tree" class="space-y-6"></div>
+      </div>
+      <div id="tab-content-2" class="tab-content hidden">
+        <div id="assignee-detail" class="space-y-8"></div>
+      </div>
       <div id="tab-content-3" class="tab-content hidden">
-        <!-- New Milestones Tab -->
         <div class="flex gap-4 mb-6">
           <div>
-            <label class="text-xs text-gray-400">From</label>
-            <input id="milestone-from" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2">
+            <label class="text-xs text-gray-400 block mb-1">From</label>
+            <input id="milestone-from" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
           </div>
           <div>
-            <label class="text-xs text-gray-400">To</label>
-            <input id="milestone-to" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2">
+            <label class="text-xs text-gray-400 block mb-1">To</label>
+            <input id="milestone-to" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
           </div>
-          <button onclick="applyMilestoneDateFilter()" class="mt-5 px-5 py-2 bg-orange-500 text-white rounded-xl text-sm font-medium">Filter Dates</button>
-          <button onclick="clearMilestoneDateFilter()" class="mt-5 px-5 py-2 border border-gray-700 rounded-xl text-sm">Clear</button>
+          <button onclick="applyMilestoneDateFilter()" class="self-end px-6 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-medium">Apply</button>
+          <button onclick="clearMilestoneDateFilter()" class="self-end px-6 py-2 border border-gray-700 rounded-xl text-sm">Clear</button>
         </div>
         <div id="milestones-detail" class="space-y-6"></div>
       </div>
@@ -149,17 +161,17 @@ function fmtTime(seconds) {
 // ====================== API ======================
 async function gitlabFetch(url) {
   const res = await fetch(url, { headers: { "PRIVATE-TOKEN": appState.pat } });
-  if (!res.ok) throw new Error(`GitLab error ${res.status}`);
+  if (!res.ok) throw new Error(`GitLab API error: ${res.status}`);
   return await res.json();
 }
 
-// ====================== LOAD ======================
+// ====================== LOAD DASHBOARD ======================
 async function loadDashboard() {
   const urlStr = document.getElementById("group-url").value.trim();
   appState.pat = document.getElementById("pat").value.trim();
 
   if (!urlStr || !appState.pat) {
-    document.getElementById("input-error").textContent = "Both fields required";
+    document.getElementById("input-error").textContent = "Both fields are required";
     document.getElementById("input-error").classList.remove("hidden");
     return;
   }
@@ -180,9 +192,12 @@ async function loadDashboard() {
     const base = `${appState.host}/api/v4`;
     let epics = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics?state=opened&per_page=100`);
 
-    const promises = epics.map(async epic => {
+    const promises = epics.map(async (epic) => {
       const issues = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics/${epic.iid}/issues?per_page=100`);
-      return { epic, issues: issues.map(i => ({ ...i, estimateSeconds: parseEstimate(i) })) };
+      return {
+        epic,
+        issues: issues.map(i => ({ ...i, estimateSeconds: parseEstimate(i) }))
+      };
     });
 
     appState.epics = await Promise.all(promises);
@@ -193,45 +208,63 @@ async function loadDashboard() {
     document.getElementById("dashboard-screen").classList.remove("hidden");
 
     document.getElementById("group-name").textContent = appState.groupPath;
+
     buildFilters();
     refreshDashboard();
   } catch (err) {
-    alert("Load failed: " + err.message);
+    alert("Failed to load: " + err.message);
     document.getElementById("loading-screen").classList.add("hidden");
     document.getElementById("input-screen").classList.remove("hidden");
   }
 }
 
-// ====================== FILTERS & LABELS ======================
+// ====================== FILTERS ======================
 function buildFilters() {
   // Labels
   const labelMap = new Map();
-  appState.allIssues.forEach(i => (i.labels || []).forEach(l => labelMap.set(l.name, l)));
-
-  console.log("🔍 Labels found:", labelMap.size);   // ← Debug line (check browser console)
+  appState.allIssues.forEach(issue => {
+    (issue.labels || []).forEach(l => labelMap.set(l.name, l));
+  });
 
   let html = "";
   labelMap.forEach(l => {
     html += `<div data-label="${l.name}" onclick="toggleLabel(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
-      <span class="w-4 h-4 rounded" style="background:${l.color || '#666'}"></span>
+      <span class="w-4 h-4 rounded flex-shrink-0" style="background:${l.color || '#666'}"></span>
       ${l.name}
     </div>`;
   });
 
-  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm'>No labels found on any issues</p>";
-  document.getElementById("label-count-badge").textContent = `(${labelMap.size})`;
+  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No labels found</p>";
+  document.getElementById("label-count").textContent = `(${labelMap.size})`;
+
+  // Assignees
+  const assigneeMap = new Map();
+  appState.allIssues.forEach(issue => {
+    (issue.assignees || []).forEach(a => assigneeMap.set(a.id, a));
+  });
+
+  html = "";
+  assigneeMap.forEach(a => {
+    html += `<div data-assignee="${a.id}" onclick="toggleAssignee(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
+      ${a.avatar_url ? `<img src="${a.avatar_url}" class="w-6 h-6 rounded-full">` : ''}
+      ${a.name || a.username}
+    </div>`;
+  });
+  document.getElementById("assignees-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No assignees found</p>";
 }
 
 function toggleLabel(el) {
   const name = el.dataset.label;
-  appState.activeLabels.has(name) ? appState.activeLabels.delete(name) : appState.activeLabels.add(name);
+  if (appState.activeLabels.has(name)) appState.activeLabels.delete(name);
+  else appState.activeLabels.add(name);
   el.classList.toggle("active");
   applyFilters();
 }
 
 function toggleAssignee(el) {
   const id = parseInt(el.dataset.assignee);
-  appState.activeAssignees.has(id) ? appState.activeAssignees.delete(id) : appState.activeAssignees.add(id);
+  if (appState.activeAssignees.has(id)) appState.activeAssignees.delete(id);
+  else appState.activeAssignees.add(id);
   el.classList.toggle("active");
   applyFilters();
 }
@@ -241,21 +274,33 @@ function applyFilters() {
 
   appState.filteredIssues = appState.allIssues.filter(issue => {
     if (term && !issue.title.toLowerCase().includes(term)) return false;
+
     if (appState.activeLabels.size > 0) {
       const issueLabels = new Set((issue.labels || []).map(l => l.name));
       if (!Array.from(appState.activeLabels).every(l => issueLabels.has(l))) return false;
     }
+
     if (appState.activeAssignees.size > 0) {
       const ids = new Set((issue.assignees || []).map(a => a.id));
       if (!Array.from(appState.activeAssignees).some(id => ids.has(id))) return false;
     }
+
     return true;
   });
 
   refreshDashboard();
 }
 
-// ====================== REFRESH ALL ======================
+function clearFilters() {
+  appState.activeLabels.clear();
+  appState.activeAssignees.clear();
+  document.getElementById("search").value = "";
+  document.querySelector('input[name="status"][value="all"]').checked = true;
+  document.querySelectorAll('.filter-item').forEach(el => el.classList.remove('active'));
+  applyFilters();
+}
+
+// ====================== REFRESH ======================
 function refreshDashboard() {
   updateKPIs();
   renderEpicOverview();
@@ -269,7 +314,7 @@ function updateKPIs() {
   const issues = appState.filteredIssues;
   const total = issues.length;
   const open = issues.filter(i => i.state === "opened").length;
-  const estHours = (issues.reduce((sum, i) => sum + (i.estimateSeconds || 0), 0) / 3600).toFixed(1);
+  const estHours = (issues.reduce((s, i) => s + (i.estimateSeconds || 0), 0) / 3600).toFixed(1);
 
   document.getElementById("kpis").innerHTML = `
     <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-gray-400">Total</p><p class="text-4xl font-bold mono">${total}</p></div>
@@ -278,70 +323,131 @@ function updateKPIs() {
   `;
 }
 
-// ====================== RENDER FUNCTIONS ======================
-function renderEpicOverview() { /* same as before */ }
-function renderIssuesTree() { /* same as before */ }
-function renderAssigneeOverview() { /* same as before */ }
+// ====================== RENDER ======================
+function renderEpicOverview() {
+  let html = "";
+  appState.epics.forEach(({epic, issues}) => {
+    const filtered = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
+    const est = filtered.reduce((s, i) => s + (i.estimateSeconds || 0), 0);
+    html += `
+      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
+        <a href="${epic.web_url}" target="_blank" class="font-bold text-lg hover:text-orange-400 block">${epic.title}</a>
+        <p class="text-xs text-gray-500 mt-1">#${epic.iid} • ${filtered.length} issues</p>
+        <div class="mt-6 text-blue-400">${(est/3600).toFixed(1)}h estimated</div>
+      </div>`;
+  });
+  document.getElementById("epic-overview").innerHTML = html || "<p class='text-gray-400 p-8'>No open epics</p>";
+}
 
-// ====================== MILESTONES TAB (NEW) ======================
+function renderIssuesTree() {
+  let html = "";
+  appState.epics.forEach(({epic, issues}) => {
+    const filtered = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
+    if (filtered.length === 0) return;
+    html += `<div class="bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden">
+      <details open>
+        <summary class="px-6 py-5 bg-gray-800 font-semibold cursor-pointer">#${epic.iid} ${epic.title} <span class="ml-3 text-xs bg-gray-700 px-3 py-1 rounded-full">${filtered.length}</span></summary>
+        <div class="divide-y divide-gray-800">`;
+    filtered.forEach(issue => {
+      html += `<a href="${issue.web_url}" target="_blank" class="block px-6 py-4 hover:bg-gray-800 flex justify-between">
+        <span>#${issue.iid} ${issue.title}</span>
+        <span class="text-blue-400">${fmtTime(issue.estimateSeconds)}</span>
+      </a>`;
+    });
+    html += `</div></details></div>`;
+  });
+  document.getElementById("issues-tree").innerHTML = html || "<p class='text-gray-400 p-12 text-center'>No matching issues</p>";
+}
+
+function renderAssigneeOverview() {
+  const map = new Map();
+  appState.filteredIssues.forEach(issue => {
+    (issue.assignees || []).forEach(a => {
+      if (!map.has(a.id)) map.set(a.id, {user: a, issues: []});
+      map.get(a.id).issues.push(issue);
+    });
+  });
+
+  let html = "";
+  map.forEach(({user, issues}) => {
+    html += `
+      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
+        <div class="flex items-center gap-4 mb-4">
+          ${user.avatar_url ? `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` : ''}
+          <div class="font-medium">${user.name || user.username}</div>
+        </div>
+        <div class="space-y-2 text-sm">`;
+    issues.forEach(i => {
+      html += `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`;
+    });
+    html += `</div></div>`;
+  });
+  document.getElementById("assignee-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No assignees in filter</p>";
+}
+
 function renderMilestones() {
   const groups = new Map();
   appState.filteredIssues.forEach(issue => {
     if (!issue.milestone) return;
     const key = issue.milestone.id;
-    if (!groups.has(key)) groups.set(key, { milestone: issue.milestone, issues: [] });
+    if (!groups.has(key)) groups.set(key, {milestone: issue.milestone, issues: []});
     groups.get(key).issues.push(issue);
   });
 
-  // Sort by due_date (earliest first)
-  const sortedMilestones = Array.from(groups.values()).sort((a, b) => {
-    const dateA = a.milestone.due_date ? new Date(a.milestone.due_date) : new Date(9999, 0, 1);
-    const dateB = b.milestone.due_date ? new Date(b.milestone.due_date) : new Date(9999, 0, 1);
-    return dateA - dateB;
+  // Sort by due date (earliest first)
+  const sorted = Array.from(groups.values()).sort((a, b) => {
+    const da = a.milestone.due_date ? new Date(a.milestone.due_date) : new Date(9999,11,31);
+    const db = b.milestone.due_date ? new Date(b.milestone.due_date) : new Date(9999,11,31);
+    return da - db;
   });
 
   let html = "";
-  sortedMilestones.forEach(({ milestone, issues }) => {
-    const due = milestone.due_date ? new Date(milestone.due_date).toLocaleDateString() : "No due date";
+  sorted.forEach(({milestone, issues}) => {
+    const due = milestone.due_date ? milestone.due_date : "No due date";
     const closed = issues.filter(i => i.state === "closed").length;
     const pct = issues.length ? Math.round((closed / issues.length) * 100) : 0;
     html += `
       <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <div class="flex justify-between items-start">
+        <div class="flex justify-between">
           <div>
             <h3 class="font-semibold">${milestone.title}</h3>
             <p class="text-xs text-gray-400">Due: ${due}</p>
           </div>
           <span class="text-orange-400 mono">${pct}%</span>
         </div>
-        <div class="mt-4 text-sm space-y-2 max-h-60 overflow-auto">
-          ${issues.map(i => `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`).join("")}
-        </div>
-      </div>`;
+        <details class="mt-4">
+          <summary class="cursor-pointer text-sm text-gray-400 hover:text-white">View ${issues.length} issues</summary>
+          <div class="mt-3 space-y-2 text-sm max-h-60 overflow-auto">`;
+    issues.forEach(i => {
+      html += `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`;
+    });
+    html += `</div></details></div>`;
   });
 
-  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones found in current filter</p>";
+  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones in current filter</p>";
 }
 
-// Date filter for milestones
 function applyMilestoneDateFilter() {
-  // Simple re-render (you can enhance later)
+  // Placeholder - you can extend this later with actual date filtering logic
   renderMilestones();
 }
+
 function clearMilestoneDateFilter() {
   document.getElementById("milestone-from").value = "";
   document.getElementById("milestone-to").value = "";
   renderMilestones();
 }
 
-// Tab switch
+// Tab switching
 function switchTab(n) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.getElementById(`tab-content-${n}`).classList.remove('hidden');
-  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === n));
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === n));
 }
 
-function editInput() { location.reload(); }
+function editInput() {
+  location.reload();
+}
 </script>
 </body>
 </html>
