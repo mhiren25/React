@@ -1,452 +1,1442 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GitLab EpicDash</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Syne', sans-serif; }
-    .mono { font-family: 'JetBrains Mono', monospace; }
-    .kpi-card { background: linear-gradient(135deg, #111827, #1F2937); border: 1px solid #374151; transition: all 0.2s ease; }
-    .kpi-card:hover { border-color: #FC6D26; transform: translateY(-2px); }
-    .filter-item { transition: all 0.15s ease; cursor: pointer; }
-    .filter-item:hover { background: rgba(252,109,38,0.08); }
-    .filter-item.active { background: rgba(252,109,38,0.2); border-color: #FC6D26; }
-    .tab-btn.active { border-bottom: 3px solid #FC6D26; color: #FC6D26; font-weight: 600; }
-    details summary { list-style: none; cursor: pointer; }
-    .gl-btn { background: linear-gradient(135deg, #FC6D26, #E05C1F); }
-    .spinner { animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .mr-badge { background: #1F75CB; color: white; font-size: 10px; padding: 1px 6px; border-radius: 9999px; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EpicDash — GitLab Quarter Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0C0D10;
+  --surface:   #13151A;
+  --surface2:  #1C1F28;
+  --border:    #252830;
+  --border2:   #2E3240;
+  --text:      #E8EAF0;
+  --muted:     #6B7280;
+  --accent:    #FC6D26;
+  --accent2:   #E8431A;
+  --green:     #22C55E;
+  --blue:      #3B82F6;
+  --yellow:    #EAB308;
+  --red:       #EF4444;
+  --purple:    #A855F7;
+  --teal:      #14B8A6;
+  --mono:      'Space Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; overflow-x: hidden; }
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ── SPINNER ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── SETUP SCREEN ── */
+#setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(252,109,38,0.12), transparent);
+}
+.setup-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px;
+}
+.setup-logo { font-family: var(--mono); font-size: 28px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
+.setup-logo span { color: var(--accent); }
+.setup-sub { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+.field-group { margin-bottom: 20px; }
+.field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; display: block; }
+.field-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field-input:focus { border-color: var(--accent); }
+.field-input::placeholder { color: var(--muted); }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.role-btn {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 14px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  color: var(--text);
+  font-family: var(--sans);
+}
+.role-btn .role-icon { font-size: 22px; display: block; margin-bottom: 6px; }
+.role-btn .role-name { font-size: 12px; font-weight: 600; display: block; }
+.role-btn:hover { border-color: var(--accent); background: rgba(252,109,38,0.05); }
+.role-btn.selected { border-color: var(--accent); background: rgba(252,109,38,0.12); color: var(--accent); }
+.submit-btn {
+  width: 100%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.submit-btn:hover { background: var(--accent2); }
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.setup-error { color: var(--red); font-size: 13px; margin-top: 12px; display: none; }
+.saved-badge { font-size: 11px; color: var(--green); background: rgba(34,197,94,0.1); padding: 3px 8px; border-radius: 20px; margin-left: 8px; display: none; }
+.forget-link { font-size: 11px; color: var(--muted); text-decoration: underline; cursor: pointer; display: none; margin-top: 8px; }
+.forget-link:hover { color: var(--red); }
+
+/* ── LOADING ── */
+#loading-screen {
+  display: none;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+.loader-ring { width: 52px; height: 52px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; }
+.loader-text { color: var(--muted); font-size: 13px; font-family: var(--mono); }
+
+/* ── MAIN SHELL ── */
+#app { display: none; height: 100vh; flex-direction: column; }
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-logo { font-family: var(--mono); font-weight: 700; font-size: 16px; letter-spacing: -0.5px; flex-shrink: 0; }
+.topbar-logo span { color: var(--accent); }
+.topbar-group { font-size: 12px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
+.quarter-pill {
+  background: rgba(252,109,38,0.12);
+  border: 1px solid rgba(252,109,38,0.3);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+  padding: 3px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.spacer { flex: 1; }
+.role-badge-top {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+}
+.topbar-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.topbar-btn:hover { border-color: var(--border2); color: var(--text); }
+.topbar-btn.spinning .btn-icon { animation: spin 0.9s linear infinite; display: inline-block; }
+
+/* ── BODY LAYOUT ── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-search {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-search input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  outline: none;
+}
+.sidebar-search input:focus { border-color: var(--accent); }
+.sidebar-search input::placeholder { color: var(--muted); }
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+.filter-section { margin-bottom: 20px; }
+.filter-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.filter-section-count { background: var(--surface2); border-radius: 10px; padding: 1px 6px; font-size: 10px; color: var(--muted); }
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-size: 12px;
+  user-select: none;
+  border: 1px solid transparent;
+}
+.filter-chip:hover { background: var(--surface2); }
+.filter-chip.active { background: rgba(252,109,38,0.1); border-color: rgba(252,109,38,0.25); color: var(--accent); }
+.filter-chip .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.filter-chip .chip-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-chip .chip-count { font-size: 10px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
+.filter-chip.active .chip-count { color: var(--accent); }
+.avatar-sm { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.avatar-placeholder { width: 20px; height: 20px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); flex-shrink: 0; }
+.clear-filters-btn {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 7px;
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all 0.15s;
+  margin-bottom: 12px;
+}
+.clear-filters-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* ── MAIN CONTENT ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── TABS ── */
+.tab-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.tab-item {
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab-item:hover { color: var(--text); }
+.tab-item.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge { background: var(--surface2); border-radius: 10px; padding: 1px 6px; font-size: 10px; font-family: var(--mono); }
+.tab-item.active .tab-badge { background: rgba(252,109,38,0.15); color: var(--accent); }
+
+/* ── TAB PANELS ── */
+.tab-panel { display: none; flex: 1; overflow-y: auto; padding: 24px; }
+.tab-panel.active { display: block; }
+
+/* ── KPI ROW ── */
+.kpi-row { display: grid; gap: 14px; margin-bottom: 24px; }
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  transition: border-color 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.kpi-card:hover { border-color: var(--border2); }
+.kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.kpi-value { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.kpi-accent { color: var(--accent); }
+.kpi-green { color: var(--green); }
+.kpi-red { color: var(--red); }
+.kpi-blue { color: var(--blue); }
+.kpi-yellow { color: var(--yellow); }
+.kpi-purple { color: var(--purple); }
+
+/* ── PROGRESS BAR ── */
+.prog-bar { height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+.prog-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+.prog-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-align: right; }
+
+/* ── SECTION HEADER ── */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.section-meta { font-size: 11px; color: var(--muted); }
+
+/* ── EPIC CARDS ── */
+.epic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.epic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  transition: border-color 0.15s;
+}
+.epic-card:hover { border-color: var(--border2); }
+.epic-title { font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none; display: block; margin-bottom: 4px; }
+.epic-title:hover { color: var(--accent); }
+.epic-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 12px; }
+.epic-stats { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.epic-stat { display: flex; align-items: center; gap: 4px; }
+.epic-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.label-chip {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: #fff;
+  opacity: 0.85;
+}
+
+/* ── ISSUE ROWS ── */
+.issue-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.issue-group-header {
+  padding: 12px 16px;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.issue-group-header:hover { background: rgba(255,255,255,0.03); }
+.issue-group-title { font-size: 13px; font-weight: 600; flex: 1; }
+.issue-group-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.collapse-icon { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+.issue-group.collapsed .collapse-icon { transform: rotate(-90deg); }
+.issue-group.collapsed .issue-list { display: none; }
+.issue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.1s;
+  font-size: 13px;
+}
+.issue-row:hover { background: rgba(255,255,255,0.02); }
+.issue-id { font-family: var(--mono); font-size: 11px; color: var(--muted); flex-shrink: 0; min-width: 48px; }
+.issue-title-cell { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue-chips { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+.state-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.state-open { background: var(--green); }
+.state-closed { background: var(--muted); }
+.badge { font-size: 10px; padding: 1px 7px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+.badge-mr { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+.badge-blocked { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+.badge-review { background: rgba(168,85,247,0.15); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+.badge-done { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+.badge-inprogress { background: rgba(59,130,246,0.12); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+.est-label { font-size: 11px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
+.assignee-avatars { display: flex; gap: -4px; }
+.assignee-avatars img { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--bg); margin-left: -4px; }
+.assignee-avatars img:first-child { margin-left: 0; }
+
+/* ── ASSIGNEE SECTION ── */
+.assignee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.assignee-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.assignee-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.assignee-avatar { width: 36px; height: 36px; border-radius: 50%; }
+.assignee-name { font-weight: 600; font-size: 14px; }
+.assignee-stats { font-size: 11px; color: var(--muted); }
+.workload-bar { height: 6px; background: var(--surface2); border-radius: 6px; overflow: hidden; margin: 8px 0; }
+.workload-fill { height: 100%; border-radius: 6px; }
+.assignee-issues { margin-top: 10px; space-y: 4px; }
+.assignee-issue-row { font-size: 12px; padding: 4px 0; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); }
+.assignee-issue-row:first-child { border-top: none; }
+.assignee-issue-row:hover { color: var(--accent); }
+
+/* ── LABEL ANALYSIS ── */
+.label-analysis-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px; }
+.label-group-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.label-group-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
+.label-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.label-bar-name { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label-bar-track { flex: 0 0 80px; height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.label-bar-fill { height: 100%; border-radius: 4px; }
+.label-bar-count { font-size: 11px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; min-width: 20px; text-align: right; }
+
+/* ── RISK PANEL ── */
+.risk-list { display: flex; flex-direction: column; gap: 8px; }
+.risk-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: background 0.1s;
+}
+.risk-item:hover { background: var(--surface2); }
+.risk-item.warn { border-left-color: var(--yellow); }
+.risk-item.info { border-left-color: var(--blue); }
+
+/* ── EMPTY STATE ── */
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
+
+/* ── QUARTER INPUT ── */
+.quarter-input-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.quarter-input-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.quarter-input-row input {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  width: 140px;
+}
+.quarter-input-row input:focus { border-color: var(--accent); }
+.quarter-input-row button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.quarter-input-row button:hover { background: var(--accent2); }
+
+/* ── TOOLTIP ── */
+.tooltip { position: relative; }
+.tooltip:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* ── HELPER ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+</style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
+<body>
 
-<!-- Input Screen -->
-<div id="input-screen" class="min-h-screen flex items-center justify-center p-6">
-  <div class="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-10">
-    <h1 class="text-4xl font-black text-center mb-2">EpicDash</h1>
-    <p class="text-gray-400 text-center mb-8">Group Dashboard for Product Managers</p>
-    <div class="space-y-6">
-      <div>
-        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Group URL</label>
-        <input id="group-url" type="text" placeholder="https://gitlab.com/gitlab-org" class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white">
-      </div>
-      <div>
-        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Personal Access Token</label>
-        <input id="pat" type="password" placeholder="glpat-..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white">
-      </div>
-      <button onclick="loadDashboard()" class="gl-btn w-full py-4 rounded-2xl font-bold text-lg">Load Dashboard</button>
+<!-- ═══════════════════════════════ SETUP SCREEN ═══════════════════════════════ -->
+<div id="setup-screen">
+  <div class="setup-card fade-in">
+    <div class="setup-logo">Epic<span>Dash</span> <span class="saved-badge" id="saved-badge">● Saved</span></div>
+    <div class="setup-sub">GitLab Quarter Dashboard — PO / SM / DEV / QA</div>
+
+    <div class="field-group">
+      <label class="field-label">GitLab Group URL</label>
+      <input class="field-input" id="s-url" type="text" placeholder="https://gitlab.com/my-group" autocomplete="off"/>
     </div>
-    <div id="input-error" class="hidden mt-4 text-red-400 text-center"></div>
+    <div class="field-group">
+      <label class="field-label">Personal Access Token</label>
+      <input class="field-input" id="s-pat" type="password" placeholder="glpat-…" autocomplete="off"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Quarter Label <span style="color:var(--muted);font-size:10px;font-weight:400;text-transform:none;letter-spacing:0">(e.g. Committed::26Q2 or Increment::26Q2)</span></label>
+      <input class="field-input" id="s-quarter" type="text" placeholder="Committed::26Q2" autocomplete="off"/>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Your Role</label>
+      <div class="role-grid">
+        <button class="role-btn" data-role="PO" onclick="selectRole(this)">
+          <span class="role-icon">🎯</span>
+          <span class="role-name">Product Owner</span>
+        </button>
+        <button class="role-btn" data-role="SM" onclick="selectRole(this)">
+          <span class="role-icon">🧭</span>
+          <span class="role-name">Scrum Master</span>
+        </button>
+        <button class="role-btn" data-role="DEV" onclick="selectRole(this)">
+          <span class="role-icon">💻</span>
+          <span class="role-name">Developer</span>
+        </button>
+        <button class="role-btn" data-role="QA" onclick="selectRole(this)">
+          <span class="role-icon">🔍</span>
+          <span class="role-name">QA Engineer</span>
+        </button>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="load-btn" onclick="startLoad()">Load Dashboard</button>
+    <div class="setup-error" id="setup-error"></div>
+    <div style="text-align:center">
+      <span class="forget-link" id="forget-link" onclick="forgetConfig()">Forget saved config</span>
+    </div>
   </div>
 </div>
 
-<!-- Loading -->
-<div id="loading-screen" class="hidden min-h-screen flex items-center justify-center">
-  <div class="text-center">
-    <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-6"></div>
-    <p class="text-xl font-medium">Loading group data...</p>
-  </div>
+<!-- ═══════════════════════════════ LOADING ═══════════════════════════════ -->
+<div id="loading-screen" style="display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div class="loader-ring spin"></div>
+  <div class="loader-text" id="load-status">Connecting to GitLab…</div>
 </div>
 
-<!-- Dashboard -->
-<div id="dashboard-screen" class="hidden flex flex-col h-screen">
-  <header class="bg-gray-900 border-b border-gray-800 px-8 py-5 flex justify-between items-center">
-    <span class="font-black text-3xl">Epic<span class="text-orange-500">Dash</span></span>
-    <div class="flex items-center gap-6">
-      <span id="group-name" class="font-medium text-gray-300"></span>
-      <button onclick="editInput()" class="text-sm px-5 py-2 border border-gray-700 rounded-2xl hover:bg-gray-800">Change Group</button>
-    </div>
+<!-- ═══════════════════════════════ APP ═══════════════════════════════ -->
+<div id="app" style="display:none;height:100vh;flex-direction:column;">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-logo">Epic<span>Dash</span></div>
+    <div class="topbar-group" id="tb-group"></div>
+    <div class="quarter-pill" id="tb-quarter" style="display:none"></div>
+    <div class="spacer"></div>
+    <div class="role-badge-top" id="tb-role"></div>
+    <button class="topbar-btn" id="refresh-btn" onclick="refreshData()" data-tip="Re-fetch from GitLab">
+      <span class="btn-icon">↻</span> Refresh
+    </button>
+    <button class="topbar-btn" onclick="changeConfig()">⚙ Settings</button>
   </header>
 
-  <div class="flex flex-1 overflow-hidden">
-    <!-- Sidebar -->
-    <aside class="w-80 bg-gray-900 border-r border-gray-800 overflow-y-auto p-6 space-y-8">
-      <input id="search" placeholder="Search issues..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-3" onkeyup="applyFilters()">
+  <div class="app-body">
 
-      <div>
-        <p class="text-xs uppercase text-gray-500 mb-3">Labels <span id="label-count" class="text-orange-400"></span></p>
-        <div id="labels-list" class="space-y-1 max-h-80 overflow-y-auto"></div>
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-search">
+        <input type="text" placeholder="Search issues…" id="search-box" oninput="applyFilters()"/>
       </div>
+      <div class="sidebar-scroll">
+        <button class="clear-filters-btn" onclick="clearFilters()" id="clear-btn" style="display:none">✕ Clear filters</button>
 
-      <div>
-        <p class="text-xs uppercase text-gray-500 mb-3">Assignees</p>
-        <div id="assignees-list" class="space-y-1 max-h-72 overflow-y-auto"></div>
+        <!-- Status group -->
+        <div class="filter-section" id="fs-status" style="display:none">
+          <div class="filter-section-title">Status <span class="filter-section-count" id="fs-status-count"></span></div>
+          <div id="filter-status"></div>
+        </div>
+
+        <!-- Priority group -->
+        <div class="filter-section" id="fs-priority" style="display:none">
+          <div class="filter-section-title">Priority <span class="filter-section-count" id="fs-priority-count"></span></div>
+          <div id="filter-priority"></div>
+        </div>
+
+        <!-- Type group -->
+        <div class="filter-section" id="fs-type" style="display:none">
+          <div class="filter-section-title">Type <span class="filter-section-count" id="fs-type-count"></span></div>
+          <div id="filter-type"></div>
+        </div>
+
+        <!-- Component group -->
+        <div class="filter-section" id="fs-component" style="display:none">
+          <div class="filter-section-title">Component / Area <span class="filter-section-count" id="fs-component-count"></span></div>
+          <div id="filter-component"></div>
+        </div>
+
+        <!-- Other labels -->
+        <div class="filter-section" id="fs-other" style="display:none">
+          <div class="filter-section-title">Labels <span class="filter-section-count" id="fs-other-count"></span></div>
+          <div id="filter-other"></div>
+        </div>
+
+        <!-- Assignees -->
+        <div class="filter-section" id="fs-assignees">
+          <div class="filter-section-title">Assignees <span class="filter-section-count" id="fs-assignees-count"></span></div>
+          <div id="filter-assignees"></div>
+        </div>
       </div>
     </aside>
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-8">
-      <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10"></div>
+    <!-- MAIN -->
+    <div class="main">
+      <!-- TAB BAR (role-driven) -->
+      <div class="tab-bar" id="tab-bar"></div>
 
-      <div class="flex gap-10 border-b border-gray-800 mb-8">
-        <button onclick="switchTab(0)" class="tab-btn active pb-4" id="tab0">Epic Overview</button>
-        <button onclick="switchTab(1)" class="tab-btn pb-4" id="tab1">Issues Tree</button>
-        <button onclick="switchTab(2)" class="tab-btn pb-4" id="tab2">Assignees</button>
-        <button onclick="switchTab(3)" class="tab-btn pb-4" id="tab3">Milestones</button>
-      </div>
+      <!-- TAB PANELS -->
+      <div id="panel-overview" class="tab-panel active" style="display:none"></div>
+      <div id="panel-issues"   class="tab-panel" style="display:none"></div>
+      <div id="panel-assignees" class="tab-panel" style="display:none"></div>
+      <div id="panel-labels"   class="tab-panel" style="display:none"></div>
+      <div id="panel-risks"    class="tab-panel" style="display:none"></div>
+    </div>
 
-      <div id="tab-content-0" class="tab-content"><div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div></div>
-      <div id="tab-content-1" class="tab-content hidden"><div id="issues-tree" class="space-y-6"></div></div>
-      <div id="tab-content-2" class="tab-content hidden"><div id="assignee-detail" class="space-y-8"></div></div>
-      <div id="tab-content-3" class="tab-content hidden">
-        <div class="flex gap-4 mb-6 items-end">
-          <div>
-            <label class="text-xs text-gray-400 block mb-1">From</label>
-            <input id="milestone-from" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
-          </div>
-          <div>
-            <label class="text-xs text-gray-400 block mb-1">To</label>
-            <input id="milestone-to" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
-          </div>
-          <button onclick="applyFilters()" class="px-6 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-medium">Apply</button>
-          <button onclick="clearMilestoneDateFilter()" class="px-6 py-2 border border-gray-700 rounded-xl text-sm">Clear</button>
-        </div>
-        <div id="milestones-detail" class="space-y-6"></div>
-      </div>
-    </main>
   </div>
 </div>
 
 <script>
-// ====================== STATE ======================
-let appState = {
-  pat: "", host: "", groupPath: "",
+// ═══════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════
+const S = {
+  host: '', groupPath: '', pat: '', quarterLabel: '', role: '',
   epics: [], allIssues: [], filteredIssues: [],
+  groupLabels: [],
   activeLabels: new Set(), activeAssignees: new Set(),
-  groupLabels: []
+  activeTab: 'overview',
 };
 
-// ====================== ESTIMATE PARSER - Person Days ======================
-function parseEstimate(issue) {
-  if (issue.time_stats?.time_estimate) {
-    return Math.round(issue.time_stats.time_estimate / 28800); // 8 hours = 1 pd
-  }
+const ROLE_COLORS = { PO:'#FC6D26', SM:'#14B8A6', DEV:'#3B82F6', QA:'#A855F7' };
+const ROLE_LABELS = { PO:'Product Owner', SM:'Scrum Master', DEV:'Developer', QA:'QA Engineer' };
 
-  const text = (issue.labels || []).join(" ").toLowerCase();
+// ═══════════════════════════════════════════════════════════════════════
+// SETUP / PERSISTENCE
+// ═══════════════════════════════════════════════════════════════════════
+let selectedRole = '';
 
-  // Handle "Estimate::1 pd", "Estimate::2 pw", etc.
-  const match = text.match(/estimate::?(\d+)\s*(pd|pw|day|week|days|weeks)/i);
-  if (match) {
-    const num = parseInt(match[1]);
-    const unit = match[2].toLowerCase();
-    if (unit.includes('pd') || unit.includes('day')) return num;
-    if (unit.includes('pw') || unit.includes('week')) return num * 5; // 1 week = 5 pd
-  }
-  return 0;
+function selectRole(btn) {
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedRole = btn.dataset.role;
 }
 
-function fmtEstimate(pd) {
-  if (!pd) return "—";
-  return pd + " pd";
+function loadSaved() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('epicdash_cfg') || '{}');
+    if (cfg.url)     document.getElementById('s-url').value = cfg.url;
+    if (cfg.pat)     document.getElementById('s-pat').value = cfg.pat;
+    if (cfg.quarter) document.getElementById('s-quarter').value = cfg.quarter;
+    if (cfg.role) {
+      const btn = document.querySelector(`.role-btn[data-role="${cfg.role}"]`);
+      if (btn) selectRole(btn);
+    }
+    if (cfg.url || cfg.pat) {
+      document.getElementById('saved-badge').style.display = 'inline';
+      document.getElementById('forget-link').style.display = 'inline';
+    }
+  } catch(e) {}
 }
 
-// ====================== API ======================
-async function gitlabFetch(url) {
-  let results = [];
-  let nextUrl = url;
-  while (nextUrl) {
-    const res = await fetch(nextUrl, { headers: { "PRIVATE-TOKEN": appState.pat } });
-    if (!res.ok) throw new Error(`GitLab error ${res.status}`);
+function saveConfig() {
+  localStorage.setItem('epicdash_cfg', JSON.stringify({
+    url: S.host + '/' + S.groupPath,
+    pat: S.pat,
+    quarter: S.quarterLabel,
+    role: S.role,
+  }));
+}
+
+function forgetConfig() {
+  localStorage.removeItem('epicdash_cfg');
+  ['s-url','s-pat','s-quarter'].forEach(id => document.getElementById(id).value = '');
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  selectedRole = '';
+  document.getElementById('saved-badge').style.display = 'none';
+  document.getElementById('forget-link').style.display = 'none';
+}
+
+function changeConfig() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  loadSaved();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════════════════
+async function glFetch(url) {
+  let results = [], next = url;
+  while (next) {
+    const res = await fetch(next, { headers: { 'PRIVATE-TOKEN': S.pat } });
+    if (!res.ok) throw new Error(`GitLab ${res.status} — ${res.statusText}`);
     const data = await res.json();
     if (Array.isArray(data)) results = results.concat(data);
     else return data;
-    const link = res.headers.get('Link');
-    nextUrl = link ? link.match(/<([^>]+)>;\s*rel="next"/)?.[1] : null;
+    const link = res.headers.get('Link') || '';
+    next = link.match(/<([^>]+)>;\s*rel="next"/)?.[1] || null;
   }
   return results;
 }
 
-// ====================== LOAD DASHBOARD ======================
-async function loadDashboard() {
-  const urlStr = document.getElementById("group-url").value.trim();
-  appState.pat = document.getElementById("pat").value.trim();
+function setStatus(msg) { document.getElementById('load-status').textContent = msg; }
 
-  if (!urlStr || !appState.pat) {
-    document.getElementById("input-error").textContent = "Both fields required";
-    document.getElementById("input-error").classList.remove("hidden");
+// ═══════════════════════════════════════════════════════════════════════
+// LOAD
+// ═══════════════════════════════════════════════════════════════════════
+async function startLoad() {
+  const urlRaw   = document.getElementById('s-url').value.trim();
+  const pat      = document.getElementById('s-pat').value.trim();
+  const quarter  = document.getElementById('s-quarter').value.trim();
+
+  if (!urlRaw || !pat || !selectedRole) {
+    showErr('Please fill GitLab URL, token, and select a role.');
     return;
   }
 
+  let host, groupPath;
   try {
-    const u = new URL(urlStr);
-    appState.host = u.origin;
-    appState.groupPath = u.pathname.replace(/^\/groups\//, "").replace(/^\//, "").replace(/\/$/, "");
+    const u = new URL(urlRaw);
+    host = u.origin;
+    groupPath = u.pathname.replace(/^\/groups\//, '').replace(/^\//, '').replace(/\/$/, '');
   } catch {
-    alert("Invalid Group URL");
-    return;
+    showErr('Invalid GitLab URL'); return;
   }
 
-  document.getElementById("input-screen").classList.add("hidden");
-  document.getElementById("loading-screen").classList.remove("hidden");
+  S.host = host; S.groupPath = groupPath; S.pat = pat;
+  S.quarterLabel = quarter; S.role = selectedRole;
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
 
   try {
-    const base = `${appState.host}/api/v4`;
-    const encoded = encodeURIComponent(appState.groupPath);
-
-    appState.groupLabels = await gitlabFetch(`${base}/groups/${encoded}/labels?per_page=100`);
-
-    let epics = await gitlabFetch(`${base}/groups/${encoded}/epics?state=opened&per_page=100`);
-
-    const promises = epics.map(async (epic) => {
-      const issues = await gitlabFetch(`${base}/groups/${encoded}/epics/${epic.iid}/issues?per_page=100`);
-      return {
-        epic,
-        issues: issues.map(i => ({ ...i, estimatePd: parseEstimate(i) }))
-      };
-    });
-
-    appState.epics = await Promise.all(promises);
-    appState.allIssues = appState.epics.flatMap(e => e.issues);
-    appState.filteredIssues = [...appState.allIssues];
-
-    document.getElementById("loading-screen").classList.add("hidden");
-    document.getElementById("dashboard-screen").classList.remove("hidden");
-
-    document.getElementById("group-name").textContent = appState.groupPath;
-
-    buildFilters();
-    refreshDashboard();
-  } catch (err) {
-    alert("Failed to load: " + err.message);
-    document.getElementById("loading-screen").classList.add("hidden");
-    document.getElementById("input-screen").classList.remove("hidden");
+    await fetchAll();
+    saveConfig();
+    buildApp();
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+  } catch(err) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+    showErr('Failed: ' + err.message);
   }
 }
 
-// ====================== FILTERS ======================
-function buildFilters() {
-  const usage = new Map();
-  appState.allIssues.forEach(issue => {
-    (issue.labels || []).forEach(l => {
-      usage.set(l.name, (usage.get(l.name) || 0) + 1);
-    });
+async function fetchAll() {
+  const base = `${S.host}/api/v4`;
+  const enc  = encodeURIComponent(S.groupPath);
+
+  setStatus('Loading group labels…');
+  S.groupLabels = await glFetch(`${base}/groups/${enc}/labels?per_page=100`);
+
+  setStatus('Loading epics…');
+  const epicsRaw = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
+
+  setStatus(`Loading issues for ${epicsRaw.length} epics…`);
+  const epicData = await Promise.all(epicsRaw.map(async ep => {
+    const issues = await glFetch(`${base}/groups/${enc}/epics/${ep.iid}/issues?per_page=100`);
+    return { epic: ep, issues: issues.map(i => enrichIssue(i)) };
+  }));
+
+  S.epics = epicData;
+  S.allIssues = epicData.flatMap(e => e.issues);
+  S.filteredIssues = [...S.allIssues];
+}
+
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  try {
+    await fetchAll();
+    applyFilters();
+  } catch(e) { alert('Refresh failed: ' + e.message); }
+  btn.classList.remove('spinning');
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ENRICH ISSUE
+// ═══════════════════════════════════════════════════════════════════════
+function enrichIssue(i) {
+  // labels: GitLab epic-issues API returns labels as array of strings
+  const labels = Array.isArray(i.labels) ? i.labels.map(l => typeof l === 'string' ? l : l.name) : [];
+
+  const scopedMap = {};
+  const plainLabels = [];
+  labels.forEach(l => {
+    const idx = l.indexOf('::');
+    if (idx > 0) {
+      const scope = l.slice(0, idx);
+      const val   = l.slice(idx + 2);
+      if (!scopedMap[scope]) scopedMap[scope] = [];
+      scopedMap[scope].push(val);
+    } else {
+      plainLabels.push(l);
+    }
   });
 
-  const usedLabels = appState.groupLabels.filter(l => usage.has(l.name));
+  // Estimate from Estimate:: label or time_stats
+  let estimatePd = 0;
+  if (i.time_stats?.time_estimate) {
+    estimatePd = Math.round(i.time_stats.time_estimate / 28800);
+  } else if (scopedMap['Estimate']) {
+    const raw = scopedMap['Estimate'][0] || '';
+    const m = raw.match(/^(\d+)\s*(pd|pw|d|w|sp)?$/i);
+    if (m) {
+      const n = parseInt(m[1]);
+      const u = (m[2] || 'pd').toLowerCase();
+      estimatePd = u.startsWith('w') ? n * 5 : n;
+    }
+  }
 
-  const sortedLabels = usedLabels.sort((a, b) => (usage.get(b.name) || 0) - (usage.get(a.name) || 0));
+  const statusVal = (scopedMap['Status'] || [])[0] || '';
+  const isBlocked = statusVal.toLowerCase().includes('block') || labels.some(l => l.toLowerCase() === 'blocked');
+  const inReview  = statusVal.toLowerCase().includes('review');
+  const inProgress = statusVal.toLowerCase().includes('progress') || statusVal.toLowerCase().includes('doing');
+  const isDone = statusVal.toLowerCase().includes('done') || statusVal.toLowerCase().includes('complete') || i.state === 'closed';
 
-  let html = "";
-  sortedLabels.forEach(l => {
-    const count = usage.get(l.name) || 0;
-    html += `<div data-label="${l.name}" onclick="toggleLabel(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
-      <span class="w-4 h-4 rounded flex-shrink-0" style="background:${l.color || '#666'}"></span>
-      ${l.name} <span class="text-xs text-gray-500 ml-auto">(${count})</span>
-    </div>`;
-  });
+  const isCommitted = S.quarterLabel ? labels.some(l => l === S.quarterLabel) : false;
 
-  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm'>No used labels found</p>";
-  document.getElementById("label-count").textContent = `(${sortedLabels.length})`;
+  return {
+    ...i,
+    labels,           // normalised string array
+    scopedMap,
+    plainLabels,
+    estimatePd,
+    isBlocked,
+    inReview,
+    inProgress,
+    isDone,
+    isCommitted,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BUILD APP
+// ═══════════════════════════════════════════════════════════════════════
+function buildApp() {
+  // Topbar
+  document.getElementById('tb-group').textContent = S.groupPath;
+  const qp = document.getElementById('tb-quarter');
+  if (S.quarterLabel) { qp.textContent = S.quarterLabel; qp.style.display = 'inline'; }
+  const rb = document.getElementById('tb-role');
+  rb.textContent = ROLE_LABELS[S.role];
+  rb.style.background = ROLE_COLORS[S.role] + '22';
+  rb.style.color = ROLE_COLORS[S.role];
+
+  buildSidebar();
+  buildTabs();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════════════════
+const SCOPED_GROUPS = {
+  status:    { prefix: 'Status',    el: 'filter-status',    sec: 'fs-status',    cnt: 'fs-status-count' },
+  priority:  { prefix: 'Priority',  el: 'filter-priority',  sec: 'fs-priority',  cnt: 'fs-priority-count' },
+  type:      { prefix: 'Type',      el: 'filter-type',      sec: 'fs-type',      cnt: 'fs-type-count' },
+  component: { prefix: 'Component', el: 'filter-component', sec: 'fs-component', cnt: 'fs-component-count' },
+};
+const ALT_PREFIXES = { component: ['Area', 'Component'] };
+
+function buildSidebar() {
+  // Compute label usage
+  const usage = new Map(); // label string → count
+  S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
+
+  // Color map from group labels
+  const colorMap = new Map();
+  S.groupLabels.forEach(l => colorMap.set(l.name, l.color || '#6B7280'));
+
+  // Scoped filter groups
+  for (const [key, cfg] of Object.entries(SCOPED_GROUPS)) {
+    const prefixes = ALT_PREFIXES[key] || [cfg.prefix];
+    const entries = [];
+    for (const [lbl, cnt] of usage.entries()) {
+      const idx = lbl.indexOf('::');
+      if (idx > 0) {
+        const scope = lbl.slice(0, idx);
+        if (prefixes.includes(scope)) entries.push({ lbl, cnt, val: lbl.slice(idx+2) });
+      }
+    }
+    entries.sort((a,b) => b.cnt - a.cnt);
+    if (entries.length === 0) continue;
+    document.getElementById(cfg.sec).style.display = '';
+    document.getElementById(cfg.cnt).textContent = entries.length;
+    document.getElementById(cfg.el).innerHTML = entries.map(e => filterChipHTML(e.lbl, e.val, e.cnt, colorMap.get(e.lbl))).join('');
+  }
+
+  // Other (non-scoped, non-quarter) labels
+  const scoped_prefixes = new Set(['Status','Priority','Type','Component','Area','Estimate','Committed','Increment','Team','Squad']);
+  const otherEntries = [];
+  for (const [lbl, cnt] of usage.entries()) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0 && scoped_prefixes.has(lbl.slice(0, idx))) continue;
+    if (lbl === S.quarterLabel) continue;
+    otherEntries.push({ lbl, cnt });
+  }
+  otherEntries.sort((a,b) => b.cnt - a.cnt);
+  if (otherEntries.length) {
+    document.getElementById('fs-other').style.display = '';
+    document.getElementById('fs-other-count').textContent = otherEntries.length;
+    document.getElementById('filter-other').innerHTML = otherEntries.slice(0, 30).map(e => filterChipHTML(e.lbl, e.lbl, e.cnt, colorMap.get(e.lbl))).join('');
+  }
 
   // Assignees
-  const assigneeMap = new Map();
-  appState.allIssues.forEach(issue => (issue.assignees || []).forEach(a => assigneeMap.set(a.id, a)));
-  let ahtml = "";
-  assigneeMap.forEach(a => {
-    ahtml += `<div data-assignee="${a.id}" onclick="toggleAssignee(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
-      ${a.avatar_url ? `<img src="${a.avatar_url}" class="w-6 h-6 rounded-full">` : ''}
-      ${a.name || a.username}
-    </div>`;
-  });
-  document.getElementById("assignees-list").innerHTML = ahtml || "<p class='text-gray-500 text-sm'>No assignees</p>";
+  const aMap = new Map();
+  S.allIssues.forEach(i => (i.assignees||[]).forEach(a => { if(!aMap.has(a.id)) aMap.set(a.id,{a,cnt:0}); aMap.get(a.id).cnt++; }));
+  const aEntries = [...aMap.values()].sort((x,y) => y.cnt-x.cnt);
+  document.getElementById('fs-assignees-count').textContent = aEntries.length;
+  document.getElementById('filter-assignees').innerHTML = aEntries.map(({a,cnt}) => `
+    <div class="filter-chip" data-assignee="${a.id}" onclick="toggleAssignee(this)">
+      ${a.avatar_url ? `<img class="avatar-sm" src="${a.avatar_url}" alt="">` : `<div class="avatar-placeholder">${(a.name||'?')[0]}</div>`}
+      <span class="chip-label">${a.name || a.username}</span>
+      <span class="chip-count">${cnt}</span>
+    </div>`).join('');
 }
 
+function filterChipHTML(lbl, displayName, cnt, color) {
+  const dot = color ? `<span class="chip-dot" style="background:${color}"></span>` : `<span class="chip-dot" style="background:#6B7280"></span>`;
+  return `<div class="filter-chip" data-label="${esc(lbl)}" onclick="toggleLabel(this)">
+    ${dot}<span class="chip-label">${esc(displayName)}</span><span class="chip-count">${cnt}</span>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════════════════════════════
 function toggleLabel(el) {
-  const name = el.dataset.label;
-  appState.activeLabels.has(name) ? appState.activeLabels.delete(name) : appState.activeLabels.add(name);
-  el.classList.toggle("active");
+  const lbl = el.dataset.label;
+  S.activeLabels.has(lbl) ? S.activeLabels.delete(lbl) : S.activeLabels.add(lbl);
+  el.classList.toggle('active');
+  updateClearBtn();
   applyFilters();
 }
-
 function toggleAssignee(el) {
   const id = parseInt(el.dataset.assignee);
-  appState.activeAssignees.has(id) ? appState.activeAssignees.delete(id) : appState.activeAssignees.add(id);
-  el.classList.toggle("active");
+  S.activeAssignees.has(id) ? S.activeAssignees.delete(id) : S.activeAssignees.add(id);
+  el.classList.toggle('active');
+  updateClearBtn();
   applyFilters();
 }
+function clearFilters() {
+  S.activeLabels.clear(); S.activeAssignees.clear();
+  document.getElementById('search-box').value = '';
+  document.querySelectorAll('.filter-chip.active').forEach(c => c.classList.remove('active'));
+  updateClearBtn();
+  applyFilters();
+}
+function updateClearBtn() {
+  const hasFilters = S.activeLabels.size > 0 || S.activeAssignees.size > 0 || document.getElementById('search-box').value;
+  document.getElementById('clear-btn').style.display = hasFilters ? '' : 'none';
+}
 
-async function applyFilters() {
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
-  overlay.innerHTML = `<div class="text-center"><div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-3"></div><p class="text-white">Applying filters...</p></div>`;
-  document.body.appendChild(overlay);
-
-  const term = document.getElementById("search").value.toLowerCase().trim();
-
-  appState.filteredIssues = appState.allIssues.filter(issue => {
-    if (term && !issue.title.toLowerCase().includes(term)) return false;
-    if (appState.activeLabels.size > 0) {
-      const issueLabels = new Set((issue.labels || []).map(l => l.name));
-      if (!Array.from(appState.activeLabels).every(l => issueLabels.has(l))) return false;
+function applyFilters() {
+  updateClearBtn();
+  const term = document.getElementById('search-box').value.toLowerCase();
+  S.filteredIssues = S.allIssues.filter(i => {
+    if (term && !i.title.toLowerCase().includes(term) && !String(i.iid).includes(term)) return false;
+    if (S.activeLabels.size > 0) {
+      const has = [...S.activeLabels].every(l => i.labels.includes(l));
+      if (!has) return false;
     }
-    if (appState.activeAssignees.size > 0) {
-      const ids = new Set((issue.assignees || []).map(a => a.id));
-      if (!Array.from(appState.activeAssignees).some(id => ids.has(id))) return false;
+    if (S.activeAssignees.size > 0) {
+      const ids = new Set((i.assignees||[]).map(a=>a.id));
+      if (![...S.activeAssignees].some(id => ids.has(id))) return false;
     }
     return true;
   });
-
-  refreshDashboard();
-  setTimeout(() => overlay.remove(), 300);
+  renderAll();
 }
 
-function refreshDashboard() {
-  updateKPIs();
-  renderEpicOverview();
-  renderIssuesTree();
-  renderAssigneeOverview();
-  renderMilestones();
+// ═══════════════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════════════
+const TAB_DEFS = {
+  PO:  ['overview','issues','labels','risks'],
+  SM:  ['overview','issues','assignees','risks'],
+  DEV: ['issues','assignees','overview'],
+  QA:  ['issues','labels','risks'],
+};
+const TAB_META = {
+  overview:  { label:'Quarter Overview', icon:'📊' },
+  issues:    { label:'Issues',           icon:'📋' },
+  assignees: { label:'Team Load',        icon:'👥' },
+  labels:    { label:'Label Analysis',   icon:'🏷' },
+  risks:     { label:'Risks & Blockers', icon:'⚠️' },
+};
+
+function buildTabs() {
+  const tabs = TAB_DEFS[S.role] || ['overview','issues'];
+  S.activeTab = tabs[0];
+  document.getElementById('tab-bar').innerHTML = tabs.map(t => `
+    <div class="tab-item ${t===S.activeTab?'active':''}" data-tab="${t}" onclick="switchTab('${t}')">
+      ${TAB_META[t].icon} ${TAB_META[t].label}
+      <span class="tab-badge" id="tab-badge-${t}"></span>
+    </div>`).join('');
+
+  // Show panels
+  tabs.forEach(t => { document.getElementById(`panel-${t}`).style.display = 'none'; });
+  document.getElementById(`panel-${S.activeTab}`).style.display = 'block';
+  document.getElementById(`panel-${S.activeTab}`).classList.add('active');
 }
 
-// ====================== KPIs ======================
-function updateKPIs() {
-  const issues = appState.filteredIssues;
-  const total = issues.length;
-  const open = issues.filter(i => i.state === "opened").length;
-  const totalPd = issues.reduce((s, i) => s + (i.estimatePd || 0), 0);
-
-  document.getElementById("kpis").innerHTML = `
-    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-gray-400">Total</p><p class="text-4xl font-bold mono">${total}</p></div>
-    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-green-400">Open</p><p class="text-4xl font-bold mono text-green-400">${open}</p></div>
-    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-blue-400">Estimated</p><p class="text-4xl font-bold mono text-blue-400">${totalPd} pd</p></div>
-  `;
+function switchTab(tab) {
+  document.querySelectorAll('.tab-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(el => { el.style.display='none'; el.classList.remove('active'); });
+  document.getElementById(`panel-${tab}`).style.display = 'block';
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  S.activeTab = tab;
 }
 
-// ====================== RENDER ======================
-function renderEpicOverview() {
-  let html = "";
-  appState.epics.forEach(({epic, issues}) => {
-    const filtered = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
-    const totalPd = filtered.reduce((s, i) => s + (i.estimatePd || 0), 0);
-    html += `
-      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <a href="${epic.web_url}" target="_blank" class="font-bold text-lg hover:text-orange-400 block">${epic.title}</a>
-        <p class="text-xs text-gray-500 mt-1">#${epic.iid} • ${filtered.length} issues</p>
-        <div class="mt-6 text-blue-400 font-medium">${totalPd} pd estimated</div>
+// ═══════════════════════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════════════════════
+function renderAll() {
+  const tabs = TAB_DEFS[S.role] || [];
+  if (tabs.includes('overview'))   renderOverview();
+  if (tabs.includes('issues'))     renderIssues();
+  if (tabs.includes('assignees'))  renderAssignees();
+  if (tabs.includes('labels'))     renderLabels();
+  if (tabs.includes('risks'))      renderRisks();
+  updateTabBadges();
+}
+
+function updateTabBadges() {
+  const fi = S.filteredIssues;
+  const setBadge = (id, val) => { const el = document.getElementById(`tab-badge-${id}`); if(el) el.textContent = val||''; };
+  setBadge('issues', fi.length);
+  setBadge('overview', fi.filter(i=>i.isCommitted).length || fi.length);
+  setBadge('risks', fi.filter(i=>i.isBlocked).length || '');
+  const assigneeCount = new Set(fi.flatMap(i=>(i.assignees||[]).map(a=>a.id))).size;
+  setBadge('assignees', assigneeCount || '');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// OVERVIEW TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderOverview() {
+  const fi = S.filteredIssues;
+  const committed = S.quarterLabel ? fi.filter(i=>i.isCommitted) : fi;
+  const total   = committed.length;
+  const closed  = committed.filter(i=>i.state==='closed').length;
+  const open    = total - closed;
+  const blocked = committed.filter(i=>i.isBlocked).length;
+  const noEst   = committed.filter(i=>!i.estimatePd).length;
+  const noAss   = committed.filter(i=>!(i.assignees||[]).length).length;
+  const totalPd = committed.reduce((s,i)=>s+(i.estimatePd||0),0);
+  const donePd  = committed.filter(i=>i.state==='closed').reduce((s,i)=>s+(i.estimatePd||0),0);
+  const pct     = total ? Math.round(closed/total*100) : 0;
+  const color   = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';
+
+  // KPIs
+  let kpisHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+      ${kpiCard('Committed', total, '', 'var(--accent)', `${S.quarterLabel || 'all issues'}`)}
+      ${kpiCard('Closed', closed, '', 'var(--green)', `${pct}% complete`)}
+      ${kpiCard('Open', open, '', open>0?'var(--blue)':'var(--green)', `${committed.filter(i=>i.inProgress).length} in progress`)}
+      ${kpiCard('Blocked', blocked, '⚠', blocked>0?'var(--red)':'var(--muted)', blocked>0?'needs attention':'all clear')}
+      ${kpiCard('Est. Total', totalPd?totalPd+'pd':'—', '', 'var(--blue)', donePd?`${donePd}pd done`:'none closed yet')}
+      ${kpiCard('No Estimate', noEst, '!', noEst>0?'var(--yellow)':'var(--muted)', 'missing estimate')}
+      ${kpiCard('Unassigned', noAss, '', noAss>0?'var(--yellow)':'var(--muted)', 'no assignee')}
+    </div>`;
+
+  // Quarter progress bar
+  kpisHTML += `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600">${S.quarterLabel || 'Quarter'} Progress</div>
+        <div style="font-family:var(--mono);font-size:13px;color:${color}">${pct}%</div>
+      </div>
+      <div class="prog-bar" style="height:8px">
+        <div class="prog-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px">
+        <span>${closed} closed</span><span>${open} remaining</span>
+      </div>
+    </div>`;
+
+  // Epics summary
+  kpisHTML += `<div style="font-size:13px;font-weight:600;margin-bottom:12px">Epics (${S.epics.length})</div>
+    <div class="epic-grid">`;
+
+  S.epics.forEach(({epic, issues}) => {
+    const filtered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
+    if (filtered.length === 0) return;
+    const epicClosed = filtered.filter(i=>i.state==='closed').length;
+    const epicPct    = filtered.length ? Math.round(epicClosed/filtered.length*100) : 0;
+    const epicPd     = filtered.reduce((s,i)=>s+(i.estimatePd||0),0);
+    const epicBlocked= filtered.filter(i=>i.isBlocked).length;
+    const epicPcol   = epicPct>=75?'var(--green)':epicPct>=40?'var(--yellow)':'var(--accent)';
+
+    // Collect label chips (Status values for this epic)
+    const statusVals = [...new Set(filtered.flatMap(i=>i.scopedMap['Status']||[]))].slice(0,3);
+
+    kpisHTML += `
+      <div class="epic-card">
+        <a href="${epic.web_url}" target="_blank" class="epic-title">${esc(epic.title)}</a>
+        <div class="epic-meta">#${epic.iid} · ${filtered.length} issues</div>
+        <div class="epic-stats">
+          <span class="epic-stat" style="color:var(--green)">✓ ${epicClosed} closed</span>
+          <span class="epic-stat" style="color:var(--blue)">◷ ${filtered.length - epicClosed} open</span>
+          ${epicBlocked ? `<span class="epic-stat" style="color:var(--red)">⚠ ${epicBlocked} blocked</span>` : ''}
+          ${epicPd ? `<span class="epic-stat" style="color:var(--muted)">${epicPd}pd</span>` : ''}
+        </div>
+        <div class="prog-bar">
+          <div class="prog-fill" style="width:${epicPct}%;background:${epicPcol}"></div>
+        </div>
+        <div style="font-size:10px;color:${epicPcol};text-align:right;margin-top:4px;font-family:var(--mono)">${epicPct}%</div>
+        ${statusVals.length ? `<div class="epic-labels">${statusVals.map(v=>`<span class="label-chip" style="background:#374151">${esc(v)}</span>`).join('')}</div>` : ''}
       </div>`;
   });
-  document.getElementById("epic-overview").innerHTML = html || "<p class='text-gray-400 p-8'>No open epics</p>";
+  kpisHTML += '</div>';
+
+  document.getElementById('panel-overview').innerHTML = kpisHTML;
 }
 
-function renderIssuesTree() {
-  let html = "";
-  appState.epics.forEach(({epic, issues}) => {
-    const filtered = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
-    if (filtered.length === 0) return;
-    html += `<div class="bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden">
-      <details open>
-        <summary class="px-6 py-5 bg-gray-800 font-semibold cursor-pointer">#${epic.iid} ${epic.title} <span class="ml-3 text-xs bg-gray-700 px-3 py-1 rounded-full">${filtered.length}</span></summary>
-        <div class="divide-y divide-gray-800">`;
-    filtered.forEach(issue => {
-      const hasMR = (issue.merge_requests_count || 0) > 0;
+function kpiCard(label, value, icon, color, sub) {
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value" style="color:${color}">${icon?icon+' ':''}${value}</div>
+    <div class="kpi-sub">${sub}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ISSUES TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderIssues() {
+  const colorMap = new Map();
+  S.groupLabels.forEach(l => colorMap.set(l.name, l.color || '#6B7280'));
+
+  let html = '';
+  S.epics.forEach(({epic, issues}) => {
+    const filtered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
+    if (!filtered.length) return;
+
+    const closed = filtered.filter(i=>i.state==='closed').length;
+    const blocked = filtered.filter(i=>i.isBlocked).length;
+
+    html += `
+      <div class="issue-group" id="ig-${epic.iid}">
+        <div class="issue-group-header" onclick="toggleGroup('ig-${epic.iid}')">
+          <span class="collapse-icon">▾</span>
+          <span class="issue-group-title">${esc(epic.title)}</span>
+          <span class="issue-group-meta">${closed}/${filtered.length} closed${blocked?` · ${blocked} blocked`:''}</span>
+          <a href="${epic.web_url}" target="_blank" onclick="e=>e.stopPropagation()" style="font-size:11px;color:var(--muted);text-decoration:none;margin-left:8px">↗</a>
+        </div>
+        <div class="issue-list">`;
+
+    filtered.forEach(i => {
+      const assigneeImgs = (i.assignees||[]).slice(0,3).map(a =>
+        a.avatar_url ? `<img src="${a.avatar_url}" title="${esc(a.name||a.username)}" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--bg);margin-left:-4px">` :
+        `<div style="width:18px;height:18px;border-radius:50%;background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;font-size:8px;margin-left:-4px;">${(a.name||'?')[0]}</div>`
+      ).join('');
+
+      // Status badge
+      const statusVal = (i.scopedMap['Status']||[])[0] || '';
+      let statusBadge = '';
+      if (i.isBlocked) statusBadge = '<span class="badge badge-blocked">Blocked</span>';
+      else if (i.inReview) statusBadge = '<span class="badge badge-review">Review</span>';
+      else if (i.state === 'closed') statusBadge = '<span class="badge badge-done">Done</span>';
+      else if (i.inProgress) statusBadge = '<span class="badge badge-inprogress">In Progress</span>';
+
+      // Type label
+      const typeVal = (i.scopedMap['Type']||[])[0] || '';
+      const priorityVal = (i.scopedMap['Priority']||[])[0] || '';
+
+      const labelChips = [];
+      if (typeVal) labelChips.push(`<span class="badge" style="background:rgba(20,184,166,0.12);color:var(--teal);border:1px solid rgba(20,184,166,0.25)">${esc(typeVal)}</span>`);
+      if (priorityVal) {
+        const pc = priorityVal.toLowerCase().includes('high')?'var(--red)':priorityVal.toLowerCase().includes('med')?'var(--yellow)':'var(--muted)';
+        labelChips.push(`<span class="badge" style="background:rgba(0,0,0,0.2);color:${pc};border:1px solid ${pc}44">${esc(priorityVal)}</span>`);
+      }
+
       html += `
-        <a href="${issue.web_url}" target="_blank" class="block px-6 py-4 hover:bg-gray-800 flex justify-between items-center">
-          <span>#${issue.iid} ${issue.title}</span>
-          <div class="flex items-center gap-3">
-            ${hasMR ? '<span class="mr-badge">MR</span>' : ''}
-            <span class="text-blue-400">${fmtEstimate(issue.estimatePd)}</span>
+        <a href="${i.web_url}" target="_blank" class="issue-row">
+          <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+          <div class="issue-id">#${i.iid}</div>
+          <div class="issue-title-cell">${esc(i.title)}</div>
+          <div class="issue-chips">
+            ${statusBadge}
+            ${labelChips.join('')}
+            ${i.merge_requests_count ? '<span class="badge badge-mr">MR</span>' : ''}
+            ${i.estimatePd ? `<span class="est-label">${i.estimatePd}pd</span>` : ''}
+            <div style="display:flex;margin-left:4px">${assigneeImgs}</div>
           </div>
         </a>`;
     });
-    html += `</div></details></div>`;
-  });
-  document.getElementById("issues-tree").innerHTML = html || "<p class='text-gray-400 p-12 text-center'>No matching issues</p>";
-}
 
-function renderAssigneeOverview() {
-  const map = new Map();
-  appState.filteredIssues.forEach(issue => {
-    (issue.assignees || []).forEach(a => {
-      if (!map.has(a.id)) map.set(a.id, {user: a, issues: []});
-      map.get(a.id).issues.push(issue);
-    });
-  });
-
-  let html = "";
-  map.forEach(({user, issues}) => {
-    html += `
-      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <div class="flex items-center gap-4 mb-4">
-          ${user.avatar_url ? `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` : ''}
-          <div class="font-medium">${user.name || user.username}</div>
-        </div>
-        <div class="space-y-2 text-sm">`;
-    issues.forEach(i => {
-      html += `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`;
-    });
     html += `</div></div>`;
   });
-  document.getElementById("assignee-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No assignees in filter</p>";
+
+  document.getElementById('panel-issues').innerHTML = html || `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">No issues match your filters</div></div>`;
 }
 
-function renderMilestones() {
-  const groups = new Map();
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+function toggleGroup(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
 
-  appState.filteredIssues.forEach(issue => {
-    if (!issue.milestone) return;
-    if (issue.milestone.state === 'closed') return;
-    if (issue.milestone.due_date && new Date(issue.milestone.due_date) < threeMonthsAgo) return;
-
-    const key = issue.milestone.id;
-    if (!groups.has(key)) groups.set(key, {milestone: issue.milestone, issues: []});
-    groups.get(key).issues.push(issue);
+// ═══════════════════════════════════════════════════════════════════════
+// ASSIGNEES TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderAssignees() {
+  const aMap = new Map();
+  S.filteredIssues.forEach(i => {
+    (i.assignees||[]).forEach(a => {
+      if (!aMap.has(a.id)) aMap.set(a.id, { user: a, issues: [], pd: 0 });
+      const entry = aMap.get(a.id);
+      entry.issues.push(i);
+      entry.pd += i.estimatePd || 0;
+    });
   });
 
-  const fromDate = document.getElementById("milestone-from").value ? new Date(document.getElementById("milestone-from").value) : null;
-  const toDate = document.getElementById("milestone-to").value ? new Date(document.getElementById("milestone-to").value) : null;
+  const maxPd = Math.max(...[...aMap.values()].map(e=>e.pd), 1);
 
-  let filtered = Array.from(groups.values());
-  if (fromDate || toDate) {
-    filtered = filtered.filter(({milestone}) => {
-      if (!milestone.due_date) return false;
-      const due = new Date(milestone.due_date);
-      if (fromDate && due < fromDate) return false;
-      if (toDate && due > toDate) return false;
-      return true;
-    });
+  // KPIs
+  const unassigned = S.filteredIssues.filter(i=>!(i.assignees||[]).length);
+  let html = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+      ${kpiCard('Team Members', aMap.size, '', 'var(--blue)', 'with issues')}
+      ${kpiCard('Unassigned', unassigned.length, unassigned.length?'!':'', unassigned.length?'var(--yellow)':'var(--green)', 'need owner')}
+    </div>`;
+
+  if (unassigned.length) {
+    html += `<div style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.2);border-radius:14px;padding:16px;margin-bottom:24px">
+      <div style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:8px">⚠ Unassigned Issues</div>
+      ${unassigned.map(i=>`<a href="${i.web_url}" target="_blank" class="assignee-issue-row" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:var(--text);font-size:12px;padding:4px 0;border-top:1px solid var(--border)">
+        <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">#${i.iid}</span>
+        <span>${esc(i.title)}</span>
+      </a>`).join('')}
+    </div>`;
   }
 
-  filtered.sort((a, b) => new Date(a.milestone.due_date || '9999-12-31') - new Date(b.milestone.due_date || '9999-12-31'));
+  html += `<div class="assignee-grid">`;
 
-  let html = "";
-  filtered.forEach(({milestone, issues}) => {
-    const due = milestone.due_date || "No due date";
+  [...aMap.values()].sort((a,b)=>b.pd-a.pd || b.issues.length-a.issues.length).forEach(({user, issues, pd}) => {
+    const open   = issues.filter(i=>i.state!=='closed').length;
+    const blocked= issues.filter(i=>i.isBlocked).length;
+    const pct    = maxPd ? Math.round(pd/maxPd*100) : 0;
+    const wcolor = pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';
+
     html += `
-      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <a href="${milestone.web_url}" target="_blank" class="font-semibold hover:text-orange-400 block">${milestone.title}</a>
-        <p class="text-xs text-gray-400">Due: ${due}</p>
-        <details class="mt-4">
-          <summary class="cursor-pointer text-sm text-gray-400 hover:text-white">View ${issues.length} issues</summary>
-          <div class="mt-3 space-y-2 text-sm max-h-60 overflow-auto">
-            ${issues.map(i => `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${i.title}</a>`).join('')}
+      <div class="assignee-card">
+        <div class="assignee-header">
+          ${user.avatar_url ? `<img class="assignee-avatar" src="${user.avatar_url}" alt="">` : `<div class="assignee-avatar" style="background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px">${(user.name||'?')[0]}</div>`}
+          <div>
+            <div class="assignee-name">${esc(user.name||user.username)}</div>
+            <div class="assignee-stats">${issues.length} issues · ${pd||'no'} pd</div>
           </div>
-        </details>
+        </div>
+        <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);margin-bottom:8px">
+          <span style="color:var(--blue)">◷ ${open} open</span>
+          <span style="color:var(--green)">✓ ${issues.length-open} closed</span>
+          ${blocked?`<span style="color:var(--red)">⚠ ${blocked} blocked</span>`:''}
+        </div>
+        <div class="workload-bar"><div class="workload-fill" style="width:${pct}%;background:${wcolor}"></div></div>
+        <div style="font-size:10px;color:${wcolor};text-align:right;font-family:var(--mono)">${pd}pd workload</div>
+        <div class="assignee-issues">
+          ${issues.slice(0,8).map(i=>`<a href="${i.web_url}" target="_blank" class="assignee-issue-row">
+            <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">#${i.iid}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(i.title)}</span>
+            ${i.isBlocked?'<span style="color:var(--red);font-size:10px">⚠</span>':''}
+          </a>`).join('')}
+          ${issues.length>8?`<div style="font-size:11px;color:var(--muted);padding-top:4px;border-top:1px solid var(--border)">+${issues.length-8} more</div>`:''}
+        </div>
       </div>`;
   });
 
-  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No active milestones in date range</p>";
+  html += '</div>';
+  document.getElementById('panel-assignees').innerHTML = html;
 }
 
-function applyMilestoneDateFilter() { renderMilestones(); }
-function clearMilestoneDateFilter() {
-  document.getElementById("milestone-from").value = "";
-  document.getElementById("milestone-to").value = "";
-  renderMilestones();
+// ═══════════════════════════════════════════════════════════════════════
+// LABELS TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderLabels() {
+  const colorMap = new Map();
+  S.groupLabels.forEach(l => colorMap.set(l.name, l.color||'#6B7280'));
+
+  // Group by scope prefix
+  const groups = new Map(); // prefix → [{label, count}]
+  const usage  = new Map();
+  S.filteredIssues.forEach(i => i.labels.forEach(l => usage.set(l,(usage.get(l)||0)+1)));
+
+  usage.forEach((cnt, lbl) => {
+    const idx = lbl.indexOf('::');
+    const group = idx > 0 ? lbl.slice(0, idx) : '(plain)';
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push({ lbl, val: idx>0?lbl.slice(idx+2):lbl, cnt });
+  });
+
+  let html = `<div style="font-size:13px;font-weight:600;margin-bottom:16px">Label Distribution — ${S.filteredIssues.length} issues</div>
+    <div class="label-analysis-grid">`;
+
+  [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([group, entries]) => {
+    const sorted = entries.sort((a,b)=>b.cnt-a.cnt);
+    const maxCnt = sorted[0]?.cnt || 1;
+    html += `<div class="label-group-card">
+      <div class="label-group-title">${esc(group)} <span style="color:var(--muted);font-size:10px">(${sorted.length})</span></div>
+      ${sorted.map(({lbl,val,cnt}) => {
+        const color = colorMap.get(lbl) || '#6B7280';
+        return `<div class="label-bar-row">
+          <div class="chip-dot" style="background:${color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
+          <div class="label-bar-name" title="${esc(lbl)}">${esc(val)}</div>
+          <div class="label-bar-track"><div class="label-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%;background:${color}66"></div></div>
+          <div class="label-bar-count">${cnt}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('panel-labels').innerHTML = html || `<div class="empty"><div class="empty-icon">🏷</div><div class="empty-text">No labels in filtered issues</div></div>`;
 }
 
-function switchTab(n) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.getElementById(`tab-content-${n}`).classList.remove('hidden');
-  document.querySelectorAll('.tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === n));
+// ═══════════════════════════════════════════════════════════════════════
+// RISKS TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderRisks() {
+  const fi = S.filteredIssues.filter(i=>i.state!=='closed');
+  const blocked  = fi.filter(i=>i.isBlocked);
+  const noEst    = fi.filter(i=>!i.estimatePd);
+  const noAss    = fi.filter(i=>!(i.assignees||[]).length);
+  const highPri  = fi.filter(i=>(i.scopedMap['Priority']||[]).some(p=>p.toLowerCase().includes('high')));
+  const inReview = fi.filter(i=>i.inReview);
+
+  let html = '';
+
+  // KPIs
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+    ${kpiCard('Blocked', blocked.length, '🚫', blocked.length?'var(--red)':'var(--green)', 'open issues')}
+    ${kpiCard('No Estimate', noEst.length, '?', noEst.length?'var(--yellow)':'var(--green)', 'missing sizing')}
+    ${kpiCard('Unassigned', noAss.length, '', noAss.length?'var(--yellow)':'var(--green)', 'no owner')}
+    ${kpiCard('High Priority', highPri.length, '🔴', highPri.length?'var(--red)':'var(--muted)', 'open issues')}
+    ${kpiCard('In Review', inReview.length, '', 'var(--purple)', 'awaiting review')}
+  </div>`;
+
+  const section = (title, items, cls, icon, empty) => {
+    if (!items.length) return `<div style="margin-bottom:20px"><div class="section-header"><div class="section-title">${icon} ${title} <span style="color:var(--green);font-size:12px;font-weight:400">✓ none</span></div></div></div>`;
+    return `<div style="margin-bottom:24px">
+      <div class="section-header"><div class="section-title">${icon} ${title} <span style="color:var(--muted);font-size:12px;font-weight:400">(${items.length})</span></div></div>
+      <div class="risk-list">
+        ${items.map(i=>`<a href="${i.web_url}" target="_blank" class="risk-item ${cls}">
+          <div class="state-dot state-open"></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0">#${i.iid}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title)}</span>
+          ${(i.assignees||[]).length?`<span style="font-size:11px;color:var(--muted)">${esc((i.assignees[0].name||i.assignees[0].username).split(' ')[0])}</span>`:'<span style="font-size:11px;color:var(--yellow)">unassigned</span>'}
+          ${i.estimatePd?`<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i.estimatePd}pd</span>`:''}
+        </a>`).join('')}
+      </div></div>`;
+  };
+
+  html += section('Blocked Issues',      blocked,  '',     '🚫', 'No blocked issues');
+  html += section('High Priority Open',  highPri,  '',     '🔴', 'No high priority issues');
+  html += section('No Estimate',         noEst,    'warn', '?',  'All issues have estimates');
+  html += section('Unassigned',          noAss,    'warn', '👤', 'All issues assigned');
+  html += section('In Review',           inReview, 'info', '👁', 'Nothing in review');
+
+  document.getElementById('panel-risks').innerHTML = html;
 }
 
-function editInput() { location.reload(); }
+// ═══════════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showErr(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 5000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════
+loadSaved();
 </script>
 </body>
 </html>
