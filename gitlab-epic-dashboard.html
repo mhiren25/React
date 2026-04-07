@@ -19,6 +19,7 @@
     .gl-btn { background: linear-gradient(135deg, #FC6D26, #E05C1F); }
     .spinner { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .mr-badge { background: #1F75CB; color: white; font-size: 10px; padding: 1px 6px; border-radius: 9999px; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -119,38 +120,28 @@ let appState = {
   groupLabels: []
 };
 
-// ====================== ESTIMATE PARSER (fixed for "Estimate::1 pd") ======================
+// ====================== ESTIMATE PARSER - Person Days ======================
 function parseEstimate(issue) {
-  if (issue.time_stats?.time_estimate) return issue.time_stats.time_estimate;
+  if (issue.time_stats?.time_estimate) {
+    return Math.round(issue.time_stats.time_estimate / 28800); // 8 hours = 1 pd
+  }
 
   const text = (issue.labels || []).join(" ").toLowerCase();
 
   // Handle "Estimate::1 pd", "Estimate::2 pw", etc.
-  const estimateMatch = text.match(/estimate::?(\d+)\s*(pd|pw|day|week|days|weeks)/);
-  if (estimateMatch) {
-    const num = parseInt(estimateMatch[1]);
-    const unit = estimateMatch[2];
-    if (unit.includes('pd') || unit.includes('day')) return num * 8 * 3600;
-    if (unit.includes('pw') || unit.includes('week')) return num * 40 * 3600;
+  const match = text.match(/estimate::?(\d+)\s*(pd|pw|day|week|days|weeks)/i);
+  if (match) {
+    const num = parseInt(match[1]);
+    const unit = match[2].toLowerCase();
+    if (unit.includes('pd') || unit.includes('day')) return num;
+    if (unit.includes('pw') || unit.includes('week')) return num * 5; // 1 week = 5 pd
   }
-
-  // Fallback to old patterns
-  const pd = text.match(/(\d+)\s*pd/);
-  const pw = text.match(/(\d+)\s*pw/);
-  const day = text.match(/(\d+)\s*day/);
-  const week = text.match(/(\d+)\s*week/);
-  if (pd) return parseInt(pd[1]) * 8 * 3600;
-  if (pw) return parseInt(pw[1]) * 40 * 3600;
-  if (day) return parseInt(day[1]) * 8 * 3600;
-  if (week) return parseInt(week[1]) * 40 * 3600;
-
   return 0;
 }
 
-function fmtTime(seconds) {
-  if (!seconds) return "—";
-  const h = Math.floor(seconds / 3600);
-  return h + "h";
+function fmtEstimate(pd) {
+  if (!pd) return "—";
+  return pd + " pd";
 }
 
 // ====================== API ======================
@@ -196,17 +187,15 @@ async function loadDashboard() {
     const base = `${appState.host}/api/v4`;
     const encoded = encodeURIComponent(appState.groupPath);
 
-    // Fetch all group labels
     appState.groupLabels = await gitlabFetch(`${base}/groups/${encoded}/labels?per_page=100`);
 
-    // Fetch open epics
     let epics = await gitlabFetch(`${base}/groups/${encoded}/epics?state=opened&per_page=100`);
 
     const promises = epics.map(async (epic) => {
       const issues = await gitlabFetch(`${base}/groups/${encoded}/epics/${epic.iid}/issues?per_page=100`);
       return {
         epic,
-        issues: issues.map(i => ({ ...i, estimateSeconds: parseEstimate(i) }))
+        issues: issues.map(i => ({ ...i, estimatePd: parseEstimate(i) }))
       };
     });
 
@@ -228,7 +217,7 @@ async function loadDashboard() {
   }
 }
 
-// ====================== FILTERS - Only used labels, sorted by usage ======================
+// ====================== FILTERS ======================
 function buildFilters() {
   const usage = new Map();
   appState.allIssues.forEach(issue => {
@@ -237,10 +226,8 @@ function buildFilters() {
     });
   });
 
-  // Filter to only labels that are actually used
   const usedLabels = appState.groupLabels.filter(l => usage.has(l.name));
 
-  // Sort by usage count (most used first)
   const sortedLabels = usedLabels.sort((a, b) => (usage.get(b.name) || 0) - (usage.get(a.name) || 0));
 
   let html = "";
@@ -282,7 +269,6 @@ function toggleAssignee(el) {
   applyFilters();
 }
 
-// ====================== FILTERING WITH SPINNER ======================
 async function applyFilters() {
   const overlay = document.createElement('div');
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -293,12 +279,10 @@ async function applyFilters() {
 
   appState.filteredIssues = appState.allIssues.filter(issue => {
     if (term && !issue.title.toLowerCase().includes(term)) return false;
-
     if (appState.activeLabels.size > 0) {
       const issueLabels = new Set((issue.labels || []).map(l => l.name));
       if (!Array.from(appState.activeLabels).every(l => issueLabels.has(l))) return false;
     }
-
     if (appState.activeAssignees.size > 0) {
       const ids = new Set((issue.assignees || []).map(a => a.id));
       if (!Array.from(appState.activeAssignees).some(id => ids.has(id))) return false;
@@ -318,17 +302,17 @@ function refreshDashboard() {
   renderMilestones();
 }
 
-// ====================== KPIs, Renders (same as before) ======================
+// ====================== KPIs ======================
 function updateKPIs() {
   const issues = appState.filteredIssues;
   const total = issues.length;
   const open = issues.filter(i => i.state === "opened").length;
-  const estHours = (issues.reduce((s, i) => s + (i.estimateSeconds || 0), 0) / 3600).toFixed(1);
+  const totalPd = issues.reduce((s, i) => s + (i.estimatePd || 0), 0);
 
   document.getElementById("kpis").innerHTML = `
     <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-gray-400">Total</p><p class="text-4xl font-bold mono">${total}</p></div>
     <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-green-400">Open</p><p class="text-4xl font-bold mono text-green-400">${open}</p></div>
-    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-blue-400">Estimated</p><p class="text-4xl font-bold mono text-blue-400">${estHours}h</p></div>
+    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-blue-400">Estimated</p><p class="text-4xl font-bold mono text-blue-400">${totalPd} pd</p></div>
   `;
 }
 
@@ -337,12 +321,12 @@ function renderEpicOverview() {
   let html = "";
   appState.epics.forEach(({epic, issues}) => {
     const filtered = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
-    const est = filtered.reduce((s, i) => s + (i.estimateSeconds || 0), 0);
+    const totalPd = filtered.reduce((s, i) => s + (i.estimatePd || 0), 0);
     html += `
       <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
         <a href="${epic.web_url}" target="_blank" class="font-bold text-lg hover:text-orange-400 block">${epic.title}</a>
         <p class="text-xs text-gray-500 mt-1">#${epic.iid} • ${filtered.length} issues</p>
-        <div class="mt-6 text-blue-400">${(est/3600).toFixed(1)}h estimated</div>
+        <div class="mt-6 text-blue-400 font-medium">${totalPd} pd estimated</div>
       </div>`;
   });
   document.getElementById("epic-overview").innerHTML = html || "<p class='text-gray-400 p-8'>No open epics</p>";
@@ -358,10 +342,15 @@ function renderIssuesTree() {
         <summary class="px-6 py-5 bg-gray-800 font-semibold cursor-pointer">#${epic.iid} ${epic.title} <span class="ml-3 text-xs bg-gray-700 px-3 py-1 rounded-full">${filtered.length}</span></summary>
         <div class="divide-y divide-gray-800">`;
     filtered.forEach(issue => {
-      html += `<a href="${issue.web_url}" target="_blank" class="block px-6 py-4 hover:bg-gray-800 flex justify-between">
-        <span>#${issue.iid} ${issue.title}</span>
-        <span class="text-blue-400">${fmtTime(issue.estimateSeconds)}</span>
-      </a>`;
+      const hasMR = (issue.merge_requests_count || 0) > 0;
+      html += `
+        <a href="${issue.web_url}" target="_blank" class="block px-6 py-4 hover:bg-gray-800 flex justify-between items-center">
+          <span>#${issue.iid} ${issue.title}</span>
+          <div class="flex items-center gap-3">
+            ${hasMR ? '<span class="mr-badge">MR</span>' : ''}
+            <span class="text-blue-400">${fmtEstimate(issue.estimatePd)}</span>
+          </div>
+        </a>`;
     });
     html += `</div></details></div>`;
   });
@@ -395,10 +384,15 @@ function renderAssigneeOverview() {
 }
 
 function renderMilestones() {
-  // Same as previous version with date filter support
   const groups = new Map();
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
   appState.filteredIssues.forEach(issue => {
     if (!issue.milestone) return;
+    if (issue.milestone.state === 'closed') return;
+    if (issue.milestone.due_date && new Date(issue.milestone.due_date) < threeMonthsAgo) return;
+
     const key = issue.milestone.id;
     if (!groups.has(key)) groups.set(key, {milestone: issue.milestone, issues: []});
     groups.get(key).issues.push(issue);
@@ -425,12 +419,8 @@ function renderMilestones() {
     const due = milestone.due_date || "No due date";
     html += `
       <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <div class="flex justify-between">
-          <div>
-            <h3 class="font-semibold">${milestone.title}</h3>
-            <p class="text-xs text-gray-400">Due: ${due}</p>
-          </div>
-        </div>
+        <a href="${milestone.web_url}" target="_blank" class="font-semibold hover:text-orange-400 block">${milestone.title}</a>
+        <p class="text-xs text-gray-400">Due: ${due}</p>
         <details class="mt-4">
           <summary class="cursor-pointer text-sm text-gray-400 hover:text-white">View ${issues.length} issues</summary>
           <div class="mt-3 space-y-2 text-sm max-h-60 overflow-auto">
@@ -440,7 +430,7 @@ function renderMilestones() {
       </div>`;
   });
 
-  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones in date range</p>";
+  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No active milestones in date range</p>";
 }
 
 function applyMilestoneDateFilter() { renderMilestones(); }
