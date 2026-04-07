@@ -10,13 +10,14 @@
     body { font-family: 'Syne', sans-serif; }
     .mono { font-family: 'JetBrains Mono', monospace; }
     .kpi-card { background: linear-gradient(135deg, #111827, #1F2937); border: 1px solid #374151; transition: all 0.2s ease; }
-    .kpi-card:hover { border-color: #FC6D26; transform: translateY(-2px); }
     .filter-item { transition: all 0.15s ease; cursor: pointer; }
     .filter-item:hover { background: rgba(252,109,38,0.08); }
     .filter-item.active { background: rgba(252,109,38,0.2); border-color: #FC6D26; }
     .tab-btn.active { border-bottom: 3px solid #FC6D26; color: #FC6D26; font-weight: 600; }
     details summary { list-style: none; cursor: pointer; }
     .gl-btn { background: linear-gradient(135deg, #FC6D26, #E05C1F); }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -25,7 +26,7 @@
 <div id="input-screen" class="min-h-screen flex items-center justify-center p-6">
   <div class="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-10">
     <h1 class="text-4xl font-black text-center mb-2">EpicDash</h1>
-    <p class="text-gray-400 text-center mb-8">Group Dashboard</p>
+    <p class="text-gray-400 text-center mb-8">Group Dashboard for Product Managers</p>
     <div class="space-y-6">
       <div>
         <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Group URL</label>
@@ -41,10 +42,10 @@
   </div>
 </div>
 
-<!-- Loading -->
+<!-- Loading Screen -->
 <div id="loading-screen" class="hidden min-h-screen flex items-center justify-center">
   <div class="text-center">
-    <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+    <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-6"></div>
     <p class="text-xl font-medium">Loading group data...</p>
   </div>
 </div>
@@ -94,11 +95,12 @@
         <button onclick="switchTab(3)" class="tab-btn pb-4" id="tab3">Milestones</button>
       </div>
 
+      <!-- Tabs -->
       <div id="tab-content-0" class="tab-content"><div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div></div>
       <div id="tab-content-1" class="tab-content hidden"><div id="issues-tree" class="space-y-6"></div></div>
       <div id="tab-content-2" class="tab-content hidden"><div id="assignee-detail" class="space-y-8"></div></div>
       <div id="tab-content-3" class="tab-content hidden">
-        <div class="flex gap-4 mb-6">
+        <div class="flex gap-4 mb-6 items-end">
           <div>
             <label class="text-xs text-gray-400 block mb-1">From</label>
             <input id="milestone-from" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
@@ -107,8 +109,8 @@
             <label class="text-xs text-gray-400 block mb-1">To</label>
             <input id="milestone-to" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
           </div>
-          <button onclick="applyMilestoneDateFilter()" class="self-end px-6 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-medium">Apply</button>
-          <button onclick="clearMilestoneDateFilter()" class="self-end px-6 py-2 border border-gray-700 rounded-xl text-sm">Clear</button>
+          <button onclick="applyFilters()" class="px-6 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-medium">Apply Date Filter</button>
+          <button onclick="clearMilestoneDateFilter()" class="px-6 py-2 border border-gray-700 rounded-xl text-sm">Clear</button>
         </div>
         <div id="milestones-detail" class="space-y-6"></div>
       </div>
@@ -122,7 +124,7 @@ let appState = {
   pat: "", host: "", groupPath: "",
   epics: [], allIssues: [], filteredIssues: [],
   activeLabels: new Set(), activeAssignees: new Set(),
-  groupLabels: []   // ← New: all labels from the group
+  groupLabels: []
 };
 
 // ====================== ESTIMATE PARSER ======================
@@ -179,17 +181,16 @@ async function loadDashboard() {
 
   try {
     const base = `${appState.host}/api/v4`;
-    const encodedPath = encodeURIComponent(appState.groupPath);
+    const encoded = encodeURIComponent(appState.groupPath);
 
-    // 1. Fetch all group-level labels (this fixes the "undefined" and missing labels)
-    appState.groupLabels = await gitlabFetch(`${base}/groups/${encodedPath}/labels`);
+    // Fetch group labels (this should give you many more labels)
+    appState.groupLabels = await gitlabFetch(`${base}/groups/${encoded}/labels`);
 
-    // 2. Fetch open epics
-    let epics = await gitlabFetch(`${base}/groups/${encodedPath}/epics?state=opened&per_page=100`);
+    // Fetch open epics
+    let epics = await gitlabFetch(`${base}/groups/${encoded}/epics?state=opened&per_page=100`);
 
-    // 3. Fetch issues for each epic
     const promises = epics.map(async (epic) => {
-      const issues = await gitlabFetch(`${base}/groups/${encodedPath}/epics/${epic.iid}/issues?per_page=100`);
+      const issues = await gitlabFetch(`${base}/groups/${encoded}/epics/${epic.iid}/issues?per_page=100`);
       return {
         epic,
         issues: issues.map(i => ({ ...i, estimateSeconds: parseEstimate(i) }))
@@ -214,32 +215,47 @@ async function loadDashboard() {
   }
 }
 
-// ====================== FILTERS (uses group labels) ======================
+// ====================== FILTERS (with usage count sorting) ======================
 function buildFilters() {
-  // Use group-level labels for the filter sidebar
+  // Count label usage
+  const usage = new Map();
+  appState.allIssues.forEach(issue => {
+    (issue.labels || []).forEach(l => {
+      usage.set(l.name, (usage.get(l.name) || 0) + 1);
+    });
+  });
+
+  // Sort group labels by usage (most used first)
+  const sortedLabels = [...appState.groupLabels].sort((a, b) => {
+    const countA = usage.get(a.name) || 0;
+    const countB = usage.get(b.name) || 0;
+    return countB - countA;
+  });
+
   let html = "";
-  appState.groupLabels.forEach(l => {
+  sortedLabels.forEach(l => {
     if (!l.name) return;
+    const count = usage.get(l.name) || 0;
     html += `<div data-label="${l.name}" onclick="toggleLabel(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
       <span class="w-4 h-4 rounded flex-shrink-0" style="background:${l.color || '#666'}"></span>
-      ${l.name}
+      ${l.name} <span class="text-xs text-gray-500 ml-auto">(${count})</span>
     </div>`;
   });
 
-  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No group labels found</p>";
-  document.getElementById("label-count").textContent = `(${appState.groupLabels.length})`;
+  document.getElementById("labels-list").innerHTML = html || "<p class='text-gray-500 text-sm'>No labels found</p>";
+  document.getElementById("label-count").textContent = `(${sortedLabels.length})`;
 
-  // Assignees (from issues)
+  // Assignees
   const assigneeMap = new Map();
   appState.allIssues.forEach(issue => (issue.assignees || []).forEach(a => assigneeMap.set(a.id, a)));
-  html = "";
+  let ahtml = "";
   assigneeMap.forEach(a => {
-    html += `<div data-assignee="${a.id}" onclick="toggleAssignee(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
+    ahtml += `<div data-assignee="${a.id}" onclick="toggleAssignee(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3 text-sm">
       ${a.avatar_url ? `<img src="${a.avatar_url}" class="w-6 h-6 rounded-full">` : ''}
       ${a.name || a.username}
     </div>`;
   });
-  document.getElementById("assignees-list").innerHTML = html || "<p class='text-gray-500 text-sm italic'>No assignees</p>";
+  document.getElementById("assignees-list").innerHTML = ahtml || "<p class='text-gray-500 text-sm'>No assignees</p>";
 }
 
 function toggleLabel(el) {
@@ -256,7 +272,13 @@ function toggleAssignee(el) {
   applyFilters();
 }
 
-function applyFilters() {
+// ====================== FILTERING WITH SPINNER ======================
+async function applyFilters() {
+  const loadingOverlay = document.createElement('div');
+  loadingOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+  loadingOverlay.innerHTML = `<div class="text-center"><div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-3"></div><p class="text-white">Applying filters...</p></div>`;
+  document.body.appendChild(loadingOverlay);
+
   const term = document.getElementById("search").value.toLowerCase().trim();
 
   appState.filteredIssues = appState.allIssues.filter(issue => {
@@ -275,9 +297,11 @@ function applyFilters() {
   });
 
   refreshDashboard();
+
+  // Remove spinner
+  setTimeout(() => loadingOverlay.remove(), 300);
 }
 
-// ====================== REFRESH ======================
 function refreshDashboard() {
   updateKPIs();
   renderEpicOverview();
@@ -286,7 +310,7 @@ function refreshDashboard() {
   renderMilestones();
 }
 
-// ====================== KPIs ======================
+// ====================== KPIs, Renders (same as before) ======================
 function updateKPIs() {
   const issues = appState.filteredIssues;
   const total = issues.length;
@@ -362,7 +386,6 @@ function renderAssigneeOverview() {
   document.getElementById("assignee-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No assignees in filter</p>";
 }
 
-// ====================== MILESTONES TAB ======================
 function renderMilestones() {
   const groups = new Map();
   appState.filteredIssues.forEach(issue => {
@@ -372,18 +395,30 @@ function renderMilestones() {
     groups.get(key).issues.push(issue);
   });
 
-  const sorted = Array.from(groups.values()).sort((a, b) => {
-    const da = a.milestone.due_date ? new Date(a.milestone.due_date) : new Date(9999,11,31);
-    const db = b.milestone.due_date ? new Date(b.milestone.due_date) : new Date(9999,11,31);
-    return da - db;
-  });
+  const fromDate = document.getElementById("milestone-from").value ? new Date(document.getElementById("milestone-from").value) : null;
+  const toDate = document.getElementById("milestone-to").value ? new Date(document.getElementById("milestone-to").value) : null;
+
+  let filteredMilestones = Array.from(groups.values());
+
+  if (fromDate || toDate) {
+    filteredMilestones = filteredMilestones.filter(({milestone}) => {
+      if (!milestone.due_date) return false;
+      const due = new Date(milestone.due_date);
+      if (fromDate && due < fromDate) return false;
+      if (toDate && due > toDate) return false;
+      return true;
+    });
+  }
+
+  // Sort by due date
+  filteredMilestones.sort((a, b) => new Date(a.milestone.due_date || '9999-12-31') - new Date(b.milestone.due_date || '9999-12-31'));
 
   let html = "";
-  sorted.forEach(({milestone, issues}) => {
+  filteredMilestones.forEach(({milestone, issues}) => {
     const due = milestone.due_date || "No due date";
     html += `
       <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
-        <div class="flex justify-between items-start">
+        <div class="flex justify-between">
           <div>
             <h3 class="font-semibold">${milestone.title}</h3>
             <p class="text-xs text-gray-400">Due: ${due}</p>
@@ -398,10 +433,13 @@ function renderMilestones() {
       </div>`;
   });
 
-  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones in current filter</p>";
+  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones match the selected date range</p>";
 }
 
-function applyMilestoneDateFilter() { renderMilestones(); }
+function applyMilestoneDateFilter() {
+  renderMilestones();
+}
+
 function clearMilestoneDateFilter() {
   document.getElementById("milestone-from").value = "";
   document.getElementById("milestone-to").value = "";
