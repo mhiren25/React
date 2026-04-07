@@ -10,6 +10,7 @@
     body { font-family: 'Syne', sans-serif; }
     .mono { font-family: 'JetBrains Mono', monospace; }
     .kpi-card { background: linear-gradient(135deg, #111827, #1F2937); border: 1px solid #374151; transition: all 0.2s ease; }
+    .kpi-card:hover { border-color: #FC6D26; transform: translateY(-2px); }
     .filter-item { transition: all 0.15s ease; cursor: pointer; }
     .filter-item:hover { background: rgba(252,109,38,0.08); }
     .filter-item.active { background: rgba(252,109,38,0.2); border-color: #FC6D26; }
@@ -42,7 +43,7 @@
   </div>
 </div>
 
-<!-- Loading Screen -->
+<!-- Loading -->
 <div id="loading-screen" class="hidden min-h-screen flex items-center justify-center">
   <div class="text-center">
     <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-6"></div>
@@ -75,7 +76,7 @@
 
       <div>
         <p class="text-xs uppercase text-gray-500 mb-3">Labels <span id="label-count" class="text-orange-400"></span></p>
-        <div id="labels-list" class="space-y-1 max-h-72 overflow-y-auto"></div>
+        <div id="labels-list" class="space-y-1 max-h-80 overflow-y-auto"></div>
       </div>
 
       <div>
@@ -84,7 +85,7 @@
       </div>
     </aside>
 
-    <!-- Main Content -->
+    <!-- Main -->
     <main class="flex-1 overflow-y-auto p-8">
       <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10"></div>
 
@@ -95,7 +96,6 @@
         <button onclick="switchTab(3)" class="tab-btn pb-4" id="tab3">Milestones</button>
       </div>
 
-      <!-- Tabs -->
       <div id="tab-content-0" class="tab-content"><div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div></div>
       <div id="tab-content-1" class="tab-content hidden"><div id="issues-tree" class="space-y-6"></div></div>
       <div id="tab-content-2" class="tab-content hidden"><div id="assignee-detail" class="space-y-8"></div></div>
@@ -109,7 +109,7 @@
             <label class="text-xs text-gray-400 block mb-1">To</label>
             <input id="milestone-to" type="date" class="bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
           </div>
-          <button onclick="applyFilters()" class="px-6 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-medium">Apply Date Filter</button>
+          <button onclick="applyFilters()" class="px-6 py-2 bg-orange-500 hover:bg-orange-600 rounded-xl text-sm font-medium">Apply</button>
           <button onclick="clearMilestoneDateFilter()" class="px-6 py-2 border border-gray-700 rounded-xl text-sm">Clear</button>
         </div>
         <div id="milestones-detail" class="space-y-6"></div>
@@ -127,7 +127,7 @@ let appState = {
   groupLabels: []
 };
 
-// ====================== ESTIMATE PARSER ======================
+// ====================== ESTIMATE ======================
 function parseEstimate(issue) {
   if (issue.time_stats?.time_estimate) return issue.time_stats.time_estimate;
   const text = (issue.labels || []).join(" ").toLowerCase();
@@ -149,14 +149,24 @@ function fmtTime(seconds) {
   return h + "h";
 }
 
-// ====================== API ======================
+// ====================== API with pagination ======================
 async function gitlabFetch(url) {
-  const res = await fetch(url, { headers: { "PRIVATE-TOKEN": appState.pat } });
-  if (!res.ok) throw new Error(`GitLab error ${res.status}`);
-  return await res.json();
+  let results = [];
+  let nextUrl = url;
+  while (nextUrl) {
+    const res = await fetch(nextUrl, { headers: { "PRIVATE-TOKEN": appState.pat } });
+    if (!res.ok) throw new Error(`GitLab error ${res.status}`);
+    const data = await res.json();
+    if (Array.isArray(data)) results = results.concat(data);
+    else return data;
+
+    const link = res.headers.get('Link');
+    nextUrl = link ? link.match(/<([^>]+)>;\s*rel="next"/)?.[1] : null;
+  }
+  return results;
 }
 
-// ====================== LOAD DASHBOARD ======================
+// ====================== LOAD ======================
 async function loadDashboard() {
   const urlStr = document.getElementById("group-url").value.trim();
   appState.pat = document.getElementById("pat").value.trim();
@@ -183,8 +193,8 @@ async function loadDashboard() {
     const base = `${appState.host}/api/v4`;
     const encoded = encodeURIComponent(appState.groupPath);
 
-    // Fetch group labels (this should give you many more labels)
-    appState.groupLabels = await gitlabFetch(`${base}/groups/${encoded}/labels`);
+    // Fetch ALL group labels with pagination
+    appState.groupLabels = await gitlabFetch(`${base}/groups/${encoded}/labels?per_page=100`);
 
     // Fetch open epics
     let epics = await gitlabFetch(`${base}/groups/${encoded}/epics?state=opened&per_page=100`);
@@ -215,9 +225,8 @@ async function loadDashboard() {
   }
 }
 
-// ====================== FILTERS (with usage count sorting) ======================
+// ====================== FILTERS (sorted by usage) ======================
 function buildFilters() {
-  // Count label usage
   const usage = new Map();
   appState.allIssues.forEach(issue => {
     (issue.labels || []).forEach(l => {
@@ -225,11 +234,8 @@ function buildFilters() {
     });
   });
 
-  // Sort group labels by usage (most used first)
   const sortedLabels = [...appState.groupLabels].sort((a, b) => {
-    const countA = usage.get(a.name) || 0;
-    const countB = usage.get(b.name) || 0;
-    return countB - countA;
+    return (usage.get(b.name) || 0) - (usage.get(a.name) || 0);
   });
 
   let html = "";
@@ -272,23 +278,20 @@ function toggleAssignee(el) {
   applyFilters();
 }
 
-// ====================== FILTERING WITH SPINNER ======================
 async function applyFilters() {
-  const loadingOverlay = document.createElement('div');
-  loadingOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
-  loadingOverlay.innerHTML = `<div class="text-center"><div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-3"></div><p class="text-white">Applying filters...</p></div>`;
-  document.body.appendChild(loadingOverlay);
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;';
+  overlay.innerHTML = `<div class="text-center"><div class="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full spinner mx-auto mb-3"></div><p class="text-white">Applying filters...</p></div>`;
+  document.body.appendChild(overlay);
 
   const term = document.getElementById("search").value.toLowerCase().trim();
 
   appState.filteredIssues = appState.allIssues.filter(issue => {
     if (term && !issue.title.toLowerCase().includes(term)) return false;
-
     if (appState.activeLabels.size > 0) {
       const issueLabels = new Set((issue.labels || []).map(l => l.name));
       if (!Array.from(appState.activeLabels).every(l => issueLabels.has(l))) return false;
     }
-
     if (appState.activeAssignees.size > 0) {
       const ids = new Set((issue.assignees || []).map(a => a.id));
       if (!Array.from(appState.activeAssignees).some(id => ids.has(id))) return false;
@@ -297,9 +300,7 @@ async function applyFilters() {
   });
 
   refreshDashboard();
-
-  // Remove spinner
-  setTimeout(() => loadingOverlay.remove(), 300);
+  setTimeout(() => overlay.remove(), 250);
 }
 
 function refreshDashboard() {
@@ -387,6 +388,7 @@ function renderAssigneeOverview() {
 }
 
 function renderMilestones() {
+  // Same as previous version with date filter support
   const groups = new Map();
   appState.filteredIssues.forEach(issue => {
     if (!issue.milestone) return;
@@ -398,10 +400,9 @@ function renderMilestones() {
   const fromDate = document.getElementById("milestone-from").value ? new Date(document.getElementById("milestone-from").value) : null;
   const toDate = document.getElementById("milestone-to").value ? new Date(document.getElementById("milestone-to").value) : null;
 
-  let filteredMilestones = Array.from(groups.values());
-
+  let filtered = Array.from(groups.values());
   if (fromDate || toDate) {
-    filteredMilestones = filteredMilestones.filter(({milestone}) => {
+    filtered = filtered.filter(({milestone}) => {
       if (!milestone.due_date) return false;
       const due = new Date(milestone.due_date);
       if (fromDate && due < fromDate) return false;
@@ -410,11 +411,10 @@ function renderMilestones() {
     });
   }
 
-  // Sort by due date
-  filteredMilestones.sort((a, b) => new Date(a.milestone.due_date || '9999-12-31') - new Date(b.milestone.due_date || '9999-12-31'));
+  filtered.sort((a, b) => new Date(a.milestone.due_date || '9999-12-31') - new Date(b.milestone.due_date || '9999-12-31'));
 
   let html = "";
-  filteredMilestones.forEach(({milestone, issues}) => {
+  filtered.forEach(({milestone, issues}) => {
     const due = milestone.due_date || "No due date";
     html += `
       <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
@@ -433,20 +433,16 @@ function renderMilestones() {
       </div>`;
   });
 
-  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones match the selected date range</p>";
+  document.getElementById("milestones-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No milestones in date range</p>";
 }
 
-function applyMilestoneDateFilter() {
-  renderMilestones();
-}
-
+function applyMilestoneDateFilter() { renderMilestones(); }
 function clearMilestoneDateFilter() {
   document.getElementById("milestone-from").value = "";
   document.getElementById("milestone-to").value = "";
   renderMilestones();
 }
 
-// Tab switching
 function switchTab(n) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.getElementById(`tab-content-${n}`).classList.remove('hidden');
