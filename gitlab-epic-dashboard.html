@@ -3,435 +3,333 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GitLab EpicDash - Group Dashboard</title>
+  <title>GitLab EpicDash</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    :root { --gl-orange: #FC6D26; }
-    * { box-sizing: border-box; }
     body { font-family: 'Syne', sans-serif; }
-    code, .mono { font-family: 'JetBrains Mono', monospace; }
-
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .fade-in { animation: fadeIn 0.35s ease both; }
-    .spinner { animation: spin 0.8s linear infinite; }
-
-    .kpi-card {
-      background: linear-gradient(135deg, #111827 0%, #1F2937 100%);
-      border: 1px solid #374151;
-      transition: all 0.2s ease;
-    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .kpi-card { background: linear-gradient(135deg, #111827, #1F2937); border: 1px solid #374151; transition: all 0.2s; }
     .kpi-card:hover { border-color: #FC6D26; transform: translateY(-2px); }
-
-    .issue-row { transition: background 0.15s ease; }
-    .issue-row:hover { background: rgba(255,255,255,0.03); }
-
     .filter-item { transition: all 0.15s ease; cursor: pointer; }
     .filter-item:hover { background: rgba(252,109,38,0.08); }
-    .filter-item.active { background: rgba(252,109,38,0.15); border-color: #FC6D26; }
-
-    .tab-btn { transition: all 0.15s ease; border-bottom: 2px solid transparent; }
-    .tab-btn.active { border-bottom-color: #FC6D26; color: #FC6D26; }
-
-    details > summary { list-style: none; cursor: pointer; }
-    details > summary .chevron { transition: transform 0.2s ease; }
-    details[open] > summary .chevron { transform: rotate(90deg); }
-
-    .gl-input:focus { outline: none; border-color: #FC6D26; box-shadow: 0 0 0 3px rgba(252,109,38,0.15); }
-    .gl-btn {
-      background: linear-gradient(135deg, #FC6D26, #E05C1F);
-      transition: all 0.2s ease;
-    }
-    .gl-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(252,109,38,0.4); }
-
-    .badge-open { background: rgba(16,133,72,0.15); color: #40BF73; border: 1px solid rgba(16,133,72,0.3); }
-    .badge-closed { background: rgba(221,43,14,0.15); color: #F57F6C; border: 1px solid rgba(221,43,14,0.3); }
+    .filter-item.active { background: rgba(252,109,38,0.2); border-color: #FC6D26; }
+    .tab-btn.active { border-bottom: 3px solid #FC6D26; color: #FC6D26; font-weight: 600; }
+    details summary { list-style: none; cursor: pointer; }
+    .gl-btn { background: linear-gradient(135deg, #FC6D26, #E05C1F); }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
 
-<!-- INPUT SCREEN -->
-<div id="input-screen" class="min-h-screen flex flex-col items-center justify-center px-4 py-12 fade-in">
-  <div class="text-center mb-10">
-    <div class="flex items-center justify-center gap-3 mb-4">
-      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M24 43.2L31.68 20.16H16.32L24 43.2Z" fill="#FC6D26"/>
-        <path d="M24 43.2L16.32 20.16H6.72L24 43.2Z" fill="#E24329"/>
-      </svg>
-      <span class="text-3xl font-black tracking-tight text-white">Epic<span class="text-orange-500">Dash</span></span>
-    </div>
-    <p class="text-gray-400 text-sm max-w-md">Complete Group Dashboard with Label-based Estimates</p>
-  </div>
-
-  <div class="w-full max-w-xl bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
-    <h2 class="text-lg font-bold text-white mb-6">Connect to GitLab Group</h2>
-    <div class="space-y-4">
+<!-- Input Screen -->
+<div id="input-screen" class="min-h-screen flex items-center justify-center p-6">
+  <div class="max-w-lg w-full bg-gray-900 border border-gray-800 rounded-3xl p-10">
+    <h1 class="text-4xl font-black text-center mb-2">EpicDash</h1>
+    <p class="text-gray-400 text-center mb-8">Group Dashboard for Product Managers</p>
+    
+    <div class="space-y-6">
       <div>
-        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Group URL</label>
-        <input id="epic-url-input" type="url" placeholder="https://gitlab.com/gitlab-org"
-          class="gl-input w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-600 mono" />
+        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">GitLab Group URL</label>
+        <input id="group-url" type="text" placeholder="https://gitlab.com/gitlab-org" 
+               class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-orange-500">
       </div>
       <div>
-        <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Personal Access Token <span class="text-orange-500/60">(read_api or api scope)</span></label>
-        <div class="relative">
-          <input id="pat-input" type="password" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx"
-            class="gl-input w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 pr-12 text-sm text-white placeholder-gray-600 mono" />
-          <button id="toggle-pat" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">👁</button>
-        </div>
+        <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2">Personal Access Token</label>
+        <input id="pat" type="password" placeholder="glpat-xxxxxxxxxxxxxxxxxxxx" 
+               class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-4 text-white focus:outline-none focus:border-orange-500">
       </div>
-      <div id="input-error" class="hidden bg-red-950/60 border border-red-800/50 rounded-lg px-4 py-3 text-sm text-red-400"></div>
-      <button onclick="loadDashboard()" class="gl-btn w-full py-3.5 rounded-lg font-bold text-white flex items-center justify-center gap-2">
-        Load Group Dashboard
-      </button>
+      <button onclick="loadDashboard()" 
+              class="gl-btn w-full py-4 rounded-2xl font-bold text-lg">Load Dashboard</button>
     </div>
+    <div id="input-error" class="hidden mt-4 text-red-400 text-center"></div>
   </div>
 </div>
 
-<!-- LOADING SCREEN -->
-<div id="loading-screen" class="hidden min-h-screen flex flex-col items-center justify-center px-4">
+<!-- Loading -->
+<div id="loading-screen" class="hidden min-h-screen flex items-center justify-center">
   <div class="text-center">
-    <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-500/10 border border-orange-500/20 mb-6">
-      <svg class="w-8 h-8 text-orange-500 spinner" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-      </svg>
-    </div>
-    <h2 class="text-xl font-bold text-white mb-2">Loading Dashboard</h2>
-    <p id="loading-status" class="text-gray-400 text-sm">Fetching epics and issues...</p>
+    <div class="w-20 h-20 border-8 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+    <p class="text-xl font-medium">Loading your group data...</p>
+    <p id="loading-text" class="text-gray-400 mt-2">Fetching epics and issues</p>
   </div>
 </div>
 
-<!-- DASHBOARD SCREEN -->
-<div id="dashboard-screen" class="hidden min-h-screen flex flex-col">
-  <header class="bg-gray-900/80 backdrop-blur border-b border-gray-800 sticky top-0 z-30 px-6">
-    <div class="flex items-center justify-between h-14">
-      <div class="flex items-center gap-3">
-        <span class="font-black text-white">Epic<span class="text-orange-500">Dash</span></span>
-        <h1 id="nav-title" class="text-sm font-semibold text-gray-300 truncate max-w-md"></h1>
-      </div>
-      <div class="flex items-center gap-3">
-        <button onclick="openHelp()" class="p-2 text-gray-400 hover:text-white">?</button>
-        <button onclick="editInput()" class="px-4 py-1.5 text-xs font-semibold border border-gray-700 hover:border-gray-500 rounded-lg">Edit Input</button>
-      </div>
+<!-- Dashboard -->
+<div id="dashboard-screen" class="hidden flex flex-col h-screen">
+  <header class="bg-gray-900 border-b border-gray-800 px-8 py-5 flex items-center justify-between">
+    <div>
+      <span class="font-black text-3xl">Epic<span class="text-orange-500">Dash</span></span>
+    </div>
+    <div class="flex items-center gap-6">
+      <span id="group-name" class="text-gray-300 font-medium"></span>
+      <button onclick="editInput()" class="text-sm px-5 py-2 border border-gray-700 rounded-2xl hover:bg-gray-800">Change Group</button>
     </div>
   </header>
 
   <div class="flex flex-1 overflow-hidden">
     <!-- Sidebar Filters -->
-    <aside id="sidebar" class="w-72 flex-shrink-0 bg-gray-900 border-r border-gray-800 overflow-y-auto p-5 space-y-6">
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Search</label>
-        <input id="search-input" type="text" placeholder="Title or description..." 
-          class="gl-input w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm" oninput="applyFilters()">
-      </div>
+    <aside class="w-80 bg-gray-900 border-r border-gray-800 overflow-y-auto p-6 space-y-8">
+      <input id="search" placeholder="Search issues..." class="w-full bg-gray-800 border border-gray-700 rounded-2xl px-5 py-3" onkeyup="applyFilters()">
 
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Status</label>
-        <div class="space-y-1">
-          <label class="filter-item flex items-center gap-2 px-3 py-2 rounded-lg border border-transparent text-xs"><input type="radio" name="status-filter" value="all" checked onchange="applyFilters()"> All</label>
-          <label class="filter-item flex items-center gap-2 px-3 py-2 rounded-lg border border-transparent text-xs"><input type="radio" name="status-filter" value="opened" onchange="applyFilters()"> Open</label>
-          <label class="filter-item flex items-center gap-2 px-3 py-2 rounded-lg border border-transparent text-xs"><input type="radio" name="status-filter" value="closed" onchange="applyFilters()"> Closed</label>
+        <p class="text-xs uppercase text-gray-500 mb-3">Status</p>
+        <div class="space-y-2">
+          <label class="filter-item flex items-center gap-3 px-4 py-3 rounded-2xl border border-transparent"><input type="radio" name="status" value="all" checked onchange="applyFilters()"> All Issues</label>
+          <label class="filter-item flex items-center gap-3 px-4 py-3 rounded-2xl border border-transparent"><input type="radio" name="status" value="opened" onchange="applyFilters()"> Open Only</label>
         </div>
       </div>
 
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Labels</label>
-        <div id="label-filters" class="max-h-64 overflow-y-auto space-y-1 pr-2"></div>
+        <p class="text-xs uppercase text-gray-500 mb-3">Labels</p>
+        <div id="labels-list" class="space-y-1 max-h-72 overflow-y-auto"></div>
       </div>
 
       <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Assignees</label>
-        <div id="assignee-filters" class="max-h-64 overflow-y-auto space-y-1 pr-2"></div>
+        <p class="text-xs uppercase text-gray-500 mb-3">Assignees</p>
+        <div id="assignees-list" class="space-y-1 max-h-72 overflow-y-auto"></div>
       </div>
-
-      <div>
-        <label class="block text-xs font-bold text-gray-500 uppercase mb-2">Milestones</label>
-        <div id="milestone-filters" class="max-h-64 overflow-y-auto space-y-1 pr-2"></div>
-      </div>
-
-      <button onclick="clearFilters()" class="w-full text-xs text-orange-400 hover:text-orange-300 py-2 border border-gray-700 rounded-lg">Clear All Filters</button>
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto p-6">
-      <!-- KPIs -->
-      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="kpi-row"></div>
+    <main class="flex-1 overflow-y-auto p-8">
+      <div id="kpis" class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10"></div>
 
-      <!-- Tabs -->
-      <div class="flex border-b border-gray-800 mb-6 overflow-x-auto">
-        <button class="tab-btn active px-6 py-3 text-sm font-semibold whitespace-nowrap" onclick="showTab(0)">Epic Overview</button>
-        <button class="tab-btn px-6 py-3 text-sm font-semibold whitespace-nowrap" onclick="showTab(1)">Issues Tree</button>
-        <button class="tab-btn px-6 py-3 text-sm font-semibold whitespace-nowrap" onclick="showTab(2)">Assignee Overview</button>
-        <button class="tab-btn px-6 py-3 text-sm font-semibold whitespace-nowrap" onclick="showTab(3)">Milestones</button>
-        <button class="tab-btn px-6 py-3 text-sm font-semibold whitespace-nowrap" onclick="showTab(4)">To Deliver</button>
+      <div class="flex gap-10 border-b border-gray-800 mb-8">
+        <button onclick="switchTab(0)" class="tab-btn active pb-4" id="tab0">Epic Overview</button>
+        <button onclick="switchTab(1)" class="tab-btn pb-4" id="tab1">Issues Tree</button>
+        <button onclick="switchTab(2)" class="tab-btn pb-4" id="tab2">Assignees</button>
+        <button onclick="switchTab(3)" class="tab-btn pb-4" id="tab3">Milestones</button>
       </div>
 
-      <!-- Tab 0: Epic Overview -->
-      <div id="tab-0" class="tab-content">
-        <div id="epic-overview-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      <div id="tab-content-0" class="tab-content">
+        <div id="epic-overview" class="grid grid-cols-1 lg:grid-cols-2 gap-6"></div>
       </div>
-
-      <!-- Tab 1: Issues Tree -->
-      <div id="tab-1" class="tab-content hidden">
-        <div id="epics-tree" class="space-y-6"></div>
+      <div id="tab-content-1" class="tab-content hidden">
+        <div id="issues-tree" class="space-y-6"></div>
       </div>
-
-      <!-- Tab 2: Assignee Overview -->
-      <div id="tab-2" class="tab-content hidden">
-        <div id="assignee-overview" class="space-y-6"></div>
+      <div id="tab-content-2" class="tab-content hidden">
+        <div id="assignee-detail" class="space-y-8"></div>
       </div>
-
-      <!-- Tab 3: Milestones -->
-      <div id="tab-3" class="tab-content hidden">
-        <div id="milestone-list" class="space-y-6"></div>
-      </div>
-
-      <!-- Tab 4: To Deliver -->
-      <div id="tab-4" class="tab-content hidden">
-        <div id="deliver-list" class="space-y-3"></div>
+      <div id="tab-content-3" class="tab-content hidden">
+        <div id="milestones-detail" class="space-y-6"></div>
       </div>
     </main>
-  </div>
-</div>
-
-<!-- HELP MODAL -->
-<div id="help-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-50" onclick="if(event.target===this)closeHelp()">
-  <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
-    <div class="p-6 border-b flex justify-between">
-      <h3 class="font-bold text-lg">How to Use</h3>
-      <button onclick="closeHelp()" class="text-gray-400 hover:text-white">✕</button>
-    </div>
-    <div class="p-6 space-y-4 text-sm">
-      <p><strong>Labels:</strong> Click multiple labels to filter (AND logic).</p>
-      <p><strong>Estimates:</strong> Supports labels like <code>1pd</code>, <code>2pw</code>, <code>3 days</code>, <code>1 week</code>.</p>
-      <p><strong>Live Filters:</strong> Every change instantly updates KPIs and all tabs.</p>
-      <p class="text-xs text-gray-500">Token stays only in memory.</p>
-    </div>
   </div>
 </div>
 
 <script>
 // ====================== STATE ======================
 let appState = {
-  pat: '', host: '', groupPath: '',
+  pat: "", host: "", groupPath: "",
   epics: [], allIssues: [], filteredIssues: [],
-  activeLabels: new Set(), activeAssignees: new Set(), activeMilestones: new Set()
+  activeLabels: new Set(), activeAssignees: new Set()
 };
 
 // ====================== ESTIMATE PARSER ======================
 function parseEstimate(issue) {
   if (issue.time_stats?.time_estimate) return issue.time_stats.time_estimate;
-  const text = (issue.labels || []).join(' ').toLowerCase();
-  const pd = text.match(/(\d+)\s*pd/);
-  const pw = text.match(/(\d+)\s*pw/);
-  const day = text.match(/(\d+)\s*day/);
-  const week = text.match(/(\d+)\s*week/);
+  const text = (issue.labels || []).join(" ").toLowerCase();
   let hours = 0;
-  if (pd) hours = parseInt(pd[1]) * 8;
-  else if (pw) hours = parseInt(pw[1]) * 40;
-  else if (day) hours = parseInt(day[1]) * 8;
-  else if (week) hours = parseInt(week[1]) * 40;
+  if (/(\d+)\s*pd/.test(text)) hours = parseInt(text.match(/(\d+)\s*pd/)[1]) * 8;
+  else if (/(\d+)\s*pw/.test(text)) hours = parseInt(text.match(/(\d+)\s*pw/)[1]) * 40;
+  else if (/(\d+)\s*day/.test(text)) hours = parseInt(text.match(/(\d+)\s*day/)[1]) * 8;
+  else if (/(\d+)\s*week/.test(text)) hours = parseInt(text.match(/(\d+)\s*week/)[1]) * 40;
   return hours * 3600;
 }
 
-// ====================== HELPERS ======================
-function escHtml(str) { return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
 function fmtTime(seconds) {
-  if (!seconds) return '—';
+  if (!seconds) return "—";
   const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return h ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
-}
-
-function toHours(seconds) { return seconds ? (seconds / 3600).toFixed(1) : '0'; }
-
-function labelStyle(color) {
-  if (!color) return {bg: '#374151', text: '#9CA3AF', border: '#6B7280'};
-  return {bg: color + '30', text: color, border: color + '60'};
-}
-
-function avatarHtml(user) {
-  if (!user) return '';
-  if (user.avatar_url) return `<img src="${user.avatar_url}" class="w-6 h-6 rounded-full" alt="">`;
-  const init = (user.name || user.username || '?').substring(0,2).toUpperCase();
-  return `<div class="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">${init}</div>`;
+  return h + "h";
 }
 
 // ====================== API ======================
-async function gitlabFetch(url, pat) {
-  let results = [];
-  let nextUrl = url;
-  while (nextUrl) {
-    const resp = await fetch(nextUrl, { headers: { 'PRIVATE-TOKEN': pat } });
-    if (!resp.ok) throw new Error(`GitLab ${resp.status}`);
-    const data = await resp.json();
-    if (Array.isArray(data)) results = results.concat(data);
-    else return data;
-    const link = resp.headers.get('Link');
-    nextUrl = link ? link.match(/<([^>]+)>;\s*rel="next"/)?.[1] : null;
-  }
-  return results;
+async function gitlabFetch(url) {
+  const res = await fetch(url, { headers: { "PRIVATE-TOKEN": appState.pat } });
+  if (!res.ok) throw new Error(`GitLab API error: ${res.status}`);
+  return await res.json();
 }
 
 // ====================== LOAD DASHBOARD ======================
 async function loadDashboard() {
-  const rawUrl = document.getElementById('epic-url-input').value.trim();
-  const pat = document.getElementById('pat-input').value.trim();
-  const errEl = document.getElementById('input-error');
-  errEl.classList.add('hidden');
+  const urlStr = document.getElementById("group-url").value.trim();
+  appState.pat = document.getElementById("pat").value.trim();
 
-  if (!rawUrl || !pat) {
-    errEl.textContent = 'Please enter Group URL and PAT';
-    errEl.classList.remove('hidden');
+  if (!urlStr || !appState.pat) {
+    document.getElementById("input-error").textContent = "Both fields are required";
+    document.getElementById("input-error").classList.remove("hidden");
     return;
   }
 
-  const urlObj = new URL(rawUrl);
-  appState.host = urlObj.origin;
-  appState.groupPath = urlObj.pathname.replace(/^\/groups\//, '').replace(/^\//, '').replace(/\/$/, '');
-  appState.pat = pat;
+  try {
+    const u = new URL(urlStr);
+    appState.host = u.origin;
+    appState.groupPath = u.pathname.replace(/^\/groups\//, "").replace(/^\//, "").replace(/\/$/, "");
+  } catch (e) {
+    alert("Invalid Group URL");
+    return;
+  }
 
-  document.getElementById('loading-status').textContent = 'Fetching epics...';
-  document.getElementById('input-screen').classList.add('hidden');
-  document.getElementById('loading-screen').classList.remove('hidden');
+  document.getElementById("input-screen").classList.add("hidden");
+  document.getElementById("loading-screen").classList.remove("hidden");
 
   try {
     const base = `${appState.host}/api/v4`;
-    const epicsList = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics?per_page=100`, pat);
+    let epics = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics?state=opened`);
 
-    document.getElementById('loading-status').textContent = `Loading issues for ${epicsList.length} epics...`;
-
-    const promises = epicsList.map(async epic => {
-      try {
-        const issues = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics/${epic.iid}/issues?per_page=100`, pat);
-        return { epic, issues: Array.isArray(issues) ? issues : [] };
-      } catch { return { epic, issues: [] }; }
+    const promises = epics.map(async (epic) => {
+      const issues = await gitlabFetch(`${base}/groups/${encodeURIComponent(appState.groupPath)}/epics/${epic.iid}/issues`);
+      return {
+        epic,
+        issues: issues.map(i => ({...i, estimateSeconds: parseEstimate(i)}))
+      };
     });
 
     appState.epics = await Promise.all(promises);
-    appState.allIssues = appState.epics.flatMap(e => e.issues.map(i => ({...i, estimateSeconds: parseEstimate(i)})));
+    appState.allIssues = appState.epics.flatMap(e => e.issues);
     appState.filteredIssues = [...appState.allIssues];
 
-    buildDashboard();
-    document.getElementById('loading-screen').classList.add('hidden');
-    document.getElementById('dashboard-screen').classList.remove('hidden');
-  } catch (e) {
-    document.getElementById('loading-screen').classList.add('hidden');
-    document.getElementById('input-screen').classList.remove('hidden');
-    errEl.textContent = `Error: ${e.message}`;
-    errEl.classList.remove('hidden');
+    document.getElementById("loading-screen").classList.add("hidden");
+    document.getElementById("dashboard-screen").classList.remove("hidden");
+
+    document.getElementById("group-name").textContent = appState.groupPath;
+    buildFilters();
+    refreshDashboard();
+  } catch (err) {
+    alert("Failed to load data: " + err.message);
+    document.getElementById("loading-screen").classList.add("hidden");
+    document.getElementById("input-screen").classList.remove("hidden");
   }
 }
 
-// ====================== BUILD DASHBOARD ======================
-function buildDashboard() {
-  document.getElementById('nav-title').textContent = `Group: ${appState.groupPath}`;
-  buildFilters();
-  refreshAllViews();
-}
-
-function refreshAllViews() {
-  updateKPIs(appState.filteredIssues);
+function refreshDashboard() {
+  updateKPIs();
   renderEpicOverview();
-  renderEpicsTree();
-  buildAssigneeOverview();
-  buildMilestonesTab();
-  buildDeliverTab();
+  renderIssuesTree();
+  renderAssigneeOverview();
+  renderMilestones();
 }
 
 // ====================== KPIs ======================
-function updateKPIs(issues) {
+function updateKPIs() {
+  const issues = appState.filteredIssues;
   const total = issues.length;
-  const open = issues.filter(i => i.state === 'opened').length;
-  const closed = total - open;
-  const est = issues.reduce((s, i) => s + (i.estimateSeconds || 0), 0);
-  const pct = total ? Math.round((closed / total) * 100) : 0;
+  const open = issues.filter(i => i.state === "opened").length;
+  const estHours = (issues.reduce((sum, i) => sum + (i.estimateSeconds || 0), 0) / 3600).toFixed(1);
 
-  document.getElementById('kpi-row').innerHTML = `
-    <div class="kpi-card rounded-2xl p-5"><p class="text-xs text-gray-500">Total Issues</p><p class="text-3xl font-black mono">${total}</p></div>
-    <div class="kpi-card rounded-2xl p-5"><p class="text-xs text-green-400">Open</p><p class="text-3xl font-black mono text-green-400">${open}</p></div>
-    <div class="kpi-card rounded-2xl p-5"><p class="text-xs text-red-400">Closed</p><p class="text-3xl font-black mono text-red-400">${closed}</p></div>
-    <div class="kpi-card rounded-2xl p-5"><p class="text-xs text-blue-400">Estimated</p><p class="text-3xl font-black mono text-blue-400">${toHours(est)}h</p></div>
-    <div class="kpi-card rounded-2xl p-5"><p class="text-xs text-orange-400">Completion</p><p class="text-3xl font-black mono text-orange-400">${pct}%</p></div>
+  document.getElementById("kpis").innerHTML = `
+    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-gray-400">Total</p><p class="text-4xl font-bold mono">${total}</p></div>
+    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-green-400">Open</p><p class="text-4xl font-bold mono text-green-400">${open}</p></div>
+    <div class="kpi-card rounded-3xl p-6"><p class="text-xs text-blue-400">Estimated</p><p class="text-4xl font-bold mono text-blue-400">${estHours}h</p></div>
   `;
 }
 
 // ====================== FILTERS ======================
 function buildFilters() {
   // Labels
-  const labelsMap = new Map();
-  appState.allIssues.forEach(issue => (issue.labels || []).forEach(l => labelsMap.set(l.name, l)));
-  const lf = document.getElementById('label-filters');
-  lf.innerHTML = Array.from(labelsMap.values()).map(l => {
-    const s = labelStyle(l.color);
-    return `<div onclick="toggleFilter('label','${escHtml(l.name)}')" data-label="${escHtml(l.name)}" class="filter-item flex items-center gap-2 px-3 py-2 rounded-lg border border-transparent text-xs">
-      <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${l.color}"></span>
-      ${escHtml(l.name)}
+  const labelMap = new Map();
+  appState.allIssues.forEach(i => (i.labels || []).forEach(l => labelMap.set(l.name, l)));
+  let html = "";
+  labelMap.forEach(l => {
+    html += `<div data-label="${l.name}" onclick="toggleLabel(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3">
+      <span class="w-4 h-4 rounded" style="background:${l.color || '#666'}"></span>
+      ${l.name}
     </div>`;
-  }).join('');
+  });
+  document.getElementById("labels-list").innerHTML = html;
 
-  // Assignees & Milestones (similar logic - abbreviated for space)
-  // ... (full version includes them)
+  // Assignees
+  const assigneeMap = new Map();
+  appState.allIssues.forEach(i => (i.assignees || []).forEach(a => assigneeMap.set(a.id, a)));
+  html = "";
+  assigneeMap.forEach(a => {
+    html += `<div data-assignee="${a.id}" onclick="toggleAssignee(this)" class="filter-item px-4 py-3 rounded-2xl border border-transparent flex items-center gap-3">
+      ${a.avatar_url ? `<img src="${a.avatar_url}" class="w-6 h-6 rounded-full">` : ''}
+      ${a.name || a.username}
+    </div>`;
+  });
+  document.getElementById("assignees-list").innerHTML = html;
 }
 
-function toggleFilter(type, value) {
-  const set = type === 'label' ? appState.activeLabels : type === 'assignee' ? appState.activeAssignees : appState.activeMilestones;
-  set.has(value) ? set.delete(value) : set.add(value);
-  document.querySelectorAll(`[data-${type}]`).forEach(el => {
-    if (el.dataset[type] === value) el.classList.toggle('active', set.has(value));
-  });
+function toggleLabel(el) {
+  const name = el.dataset.label;
+  if (appState.activeLabels.has(name)) appState.activeLabels.delete(name);
+  else appState.activeLabels.add(name);
+  el.classList.toggle("active");
+  applyFilters();
+}
+
+function toggleAssignee(el) {
+  const id = parseInt(el.dataset.assignee);
+  if (appState.activeAssignees.has(id)) appState.activeAssignees.delete(id);
+  else appState.activeAssignees.add(id);
+  el.classList.toggle("active");
   applyFilters();
 }
 
 function applyFilters() {
-  const query = document.getElementById('search-input').value.toLowerCase().trim();
-  const status = document.querySelector('input[name="status-filter"]:checked')?.value || 'all';
+  const term = document.getElementById("search").value.toLowerCase().trim();
 
   appState.filteredIssues = appState.allIssues.filter(issue => {
-    if (status !== 'all' && issue.state !== status) return false;
-    if (query && !`${issue.title} ${issue.description || ''}`.toLowerCase().includes(query)) return false;
+    if (term && !issue.title.toLowerCase().includes(term)) return false;
 
     if (appState.activeLabels.size > 0) {
-      const issueLabels = new Set((issue.labels || []).map(l => l.name));
-      for (const lbl of appState.activeLabels) if (!issueLabels.has(lbl)) return false;
+      const labels = new Set((issue.labels || []).map(l => l.name));
+      if (!Array.from(appState.activeLabels).every(l => labels.has(l))) return false;
     }
+
     if (appState.activeAssignees.size > 0) {
-      const ids = new Set((issue.assignees || []).map(a => String(a.id)));
-      let match = false;
-      for (const id of appState.activeAssignees) if (ids.has(String(id))) { match = true; break; }
-      if (!match) return false;
+      const assignees = new Set((issue.assignees || []).map(a => a.id));
+      if (!Array.from(appState.activeAssignees).some(id => assignees.has(id))) return false;
     }
-    if (appState.activeMilestones.size > 0) {
-      if (!issue.milestone || !appState.activeMilestones.has(String(issue.milestone.id))) return false;
-    }
+
     return true;
   });
 
-  refreshAllViews();
-}
-
-function clearFilters() {
-  appState.activeLabels.clear();
-  appState.activeAssignees.clear();
-  appState.activeMilestones.clear();
-  document.getElementById('search-input').value = '';
-  document.querySelector('input[name="status-filter"][value="all"]').checked = true;
-  document.querySelectorAll('.filter-item').forEach(el => el.classList.remove('active'));
-  applyFilters();
+  refreshDashboard();
 }
 
 // ====================== RENDER FUNCTIONS ======================
-function renderEpicOverview() { /* ... */ }
-function renderEpicsTree() { /* ... */ }
+function renderEpicOverview() {
+  let html = "";
+  appState.epics.forEach(({epic, issues}) => {
+    const filteredIssues = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
+    const est = filteredIssues.reduce((s, i) => s + (i.estimateSeconds || 0), 0);
+    html += `
+      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
+        <a href="${epic.web_url}" target="_blank" class="font-bold text-lg hover:text-orange-400 block">${epic.title}</a>
+        <p class="text-xs text-gray-500">#${epic.iid} • ${filteredIssues.length} issues</p>
+        <div class="mt-6 text-blue-400 font-medium">${(est/3600).toFixed(1)}h estimated</div>
+      </div>`;
+  });
+  document.getElementById("epic-overview").innerHTML = html || "<p class='text-gray-400 p-8'>No open epics found</p>";
+}
 
-function buildAssigneeOverview() {
+function renderIssuesTree() {
+  let html = "";
+  appState.epics.forEach(({epic, issues}) => {
+    const filtered = issues.filter(i => appState.filteredIssues.some(f => f.id === i.id));
+    if (filtered.length === 0) return;
+
+    html += `<div class="bg-gray-900 border border-gray-800 rounded-3xl overflow-hidden">
+      <details open>
+        <summary class="px-6 py-5 bg-gray-800 font-semibold cursor-pointer">#${epic.iid} ${epic.title} <span class="text-xs bg-gray-700 px-3 py-1 rounded-full ml-3">${filtered.length}</span></summary>
+        <div class="divide-y divide-gray-800">`;
+    
+    filtered.forEach(issue => {
+      html += `
+        <a href="${issue.web_url}" target="_blank" class="block px-6 py-4 hover:bg-gray-800 flex justify-between items-center">
+          <span>#${issue.iid} ${issue.title}</span>
+          <span class="text-blue-400 text-sm">${fmtTime(issue.estimateSeconds)}</span>
+        </a>`;
+    });
+
+    html += `</div></details></div>`;
+  });
+  document.getElementById("issues-tree").innerHTML = html || "<p class='text-gray-400 p-12 text-center'>No matching issues</p>";
+}
+
+function renderAssigneeOverview() {
   const map = new Map();
   appState.filteredIssues.forEach(issue => {
     (issue.assignees || []).forEach(a => {
@@ -439,82 +337,41 @@ function buildAssigneeOverview() {
       map.get(a.id).issues.push(issue);
     });
   });
-  const container = document.getElementById('assignee-overview');
-  container.innerHTML = Array.from(map.values()).map(({user, issues}) => `
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-      <div class="flex items-center gap-3 mb-3">
-        ${avatarHtml(user)}
-        <div>
-          <div class="font-medium">${escHtml(user.name || user.username)}</div>
-          <div class="text-xs text-gray-500">${issues.length} issues</div>
-        </div>
-      </div>
-      <div class="space-y-2 max-h-60 overflow-y-auto">
-        ${issues.map(i => `
-          <a href="${i.web_url}" target="_blank" class="block text-sm hover:text-orange-400">#${i.iid} ${escHtml(i.title)}</a>
-        `).join('')}
-      </div>
-    </div>
-  `).join('') || '<p class="text-gray-500 text-center py-12">No assignees found</p>';
-}
 
-function buildMilestonesTab() {
-  const groups = new Map();
-  appState.filteredIssues.forEach(issue => {
-    const key = issue.milestone ? issue.milestone.id : 'none';
-    if (!groups.has(key)) groups.set(key, {milestone: issue.milestone, issues: []});
-    groups.get(key).issues.push(issue);
+  let html = "";
+  map.forEach(({user, issues}) => {
+    html += `
+      <div class="bg-gray-900 border border-gray-800 rounded-3xl p-6">
+        <div class="flex items-center gap-4 mb-5">
+          ${user.avatar_url ? `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` : ''}
+          <div class="font-medium">${user.name || user.username}</div>
+        </div>
+        <div class="space-y-3">`;
+    issues.forEach(i => {
+      html += `<a href="${i.web_url}" target="_blank" class="block text-sm hover:text-orange-400">#${i.iid} ${i.title}</a>`;
+    });
+    html += `</div></div>`;
   });
-
-  const container = document.getElementById('milestone-list');
-  container.innerHTML = Array.from(groups.values()).map(({milestone, issues}) => {
-    const total = issues.length;
-    const closed = issues.filter(i => i.state === 'closed').length;
-    const est = issues.reduce((s,i) => s + (i.estimateSeconds || 0), 0);
-    const due = milestone?.due_date ? `Due: ${milestone.due_date}` : '';
-    return `
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5">
-      <div class="flex justify-between items-start">
-        <div>
-          <h3 class="font-semibold">${milestone ? escHtml(milestone.title) : 'No Milestone'}</h3>
-          <p class="text-xs text-gray-500">${due}</p>
-        </div>
-        <span class="text-orange-400 mono">${Math.round((closed/total)*100) || 0}%</span>
-      </div>
-      <details class="mt-4">
-        <summary class="cursor-pointer text-xs text-gray-400 hover:text-white">Show ${total} issues</summary>
-        <div class="mt-3 space-y-2 text-sm">
-          ${issues.map(i => `<a href="${i.web_url}" target="_blank" class="block hover:text-orange-400">#${i.iid} ${escHtml(i.title)}</a>`).join('')}
-        </div>
-      </details>
-    </div>`;
-  }).join('');
+  document.getElementById("assignee-detail").innerHTML = html || "<p class='text-gray-400 p-8'>No assignees in filtered results</p>";
 }
 
-function buildDeliverTab() { /* similar to previous */ }
+function renderMilestones() {
+  document.getElementById("milestones-detail").innerHTML = `
+    <div class="bg-gray-900 border border-gray-800 rounded-3xl p-12 text-center text-gray-400">
+      Milestone overview with due dates will be added in the next update.
+    </div>`;
+}
 
 // Tab switching
-function showTab(n) {
-  document.querySelectorAll('.tab-content').forEach((el,i) => el.classList.toggle('hidden', i !== n));
-  document.querySelectorAll('.tab-btn').forEach((el,i) => el.classList.toggle('active', i === n));
+function switchTab(n) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById(`tab-content-${n}`).classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => btn.classList.toggle('active', i === n));
 }
 
-function openHelp() { document.getElementById('help-modal').classList.remove('hidden'); }
-function closeHelp() { document.getElementById('help-modal').classList.add('hidden'); }
 function editInput() {
-  appState = {pat:'', epics:[], allIssues:[]};
-  document.getElementById('dashboard-screen').classList.add('hidden');
-  document.getElementById('input-screen').classList.remove('hidden');
+  location.reload();
 }
-
-// PAT toggle
-document.getElementById('toggle-pat').addEventListener('click', () => {
-  const input = document.getElementById('pat-input');
-  input.type = input.type === 'password' ? 'text' : 'password';
-});
-
-// Init
-document.getElementById('input-screen').classList.remove('hidden');
 </script>
 </body>
 </html>
