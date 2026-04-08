@@ -876,19 +876,32 @@ function enrichIssue(i) {
   });
 
   // ── ESTIMATE: try time_stats first, then Estimate:: scoped label ──
-  // Estimate label values can be: "3pd", "3 pd", "1pw", "2 weeks", "5sp" etc.
+  // Estimate label values can be: "3pd", "3 pd", "1pw", "2 weeks", "5sp", "8", "3days", "3 days", etc.
+  // Labels may come from parent groups so we parse from scopedMap OR from raw labels array
   let estimatePd = 0;
   if (i.time_stats?.time_estimate) {
     estimatePd = Math.round(i.time_stats.time_estimate / 28800);
-  } else if (scopedMap['Estimate'] && scopedMap['Estimate'].length > 0) {
-    const raw = scopedMap['Estimate'][0].trim();
-    // Match patterns: "3pd", "3 pd", "3d", "1pw", "1w", "2 weeks", "5sp", "8", "3days"
-    const m = raw.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
-    if (m) {
-      const n = parseFloat(m[1]);
-      const u = (m[2] || 'pd').toLowerCase();
-      if (u.startsWith('w')) estimatePd = Math.round(n * 5);
-      else estimatePd = Math.round(n); // pd, d, sp, points all treated as person-days
+  } else {
+    // Try scopedMap['Estimate'] first, then scan raw labels for any Estimate:: prefix (case-insensitive)
+    let rawEstimate = (scopedMap['Estimate'] && scopedMap['Estimate'].length > 0)
+      ? scopedMap['Estimate'][0].trim()
+      : null;
+    if (!rawEstimate) {
+      // Scan raw labels for Estimate:: from parent groups (case-insensitive prefix match)
+      for (const lbl of labels) {
+        const m = lbl.match(/^Estimate\s*::\s*(.+)$/i);
+        if (m) { rawEstimate = m[1].trim(); break; }
+      }
+    }
+    if (rawEstimate) {
+      // Match: "3pd", "3 pd", "3d", "1pw", "1 pw", "1w", "2 weeks", "5sp", "8", "3days", "0.5w" etc.
+      const m = rawEstimate.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
+      if (m) {
+        const n = parseFloat(m[1]);
+        const u = (m[2] || 'pd').toLowerCase();
+        if (u.startsWith('w')) estimatePd = Math.round(n * 5);
+        else estimatePd = Math.round(n); // pd, d, sp, points all treated as person-days
+      }
     }
   }
 
@@ -898,11 +911,17 @@ function enrichIssue(i) {
   const inProgress = statusVal.toLowerCase().includes('progress') || statusVal.toLowerCase().includes('doing') || statusVal.toLowerCase().includes('wip');
   const isDone     = statusVal.toLowerCase().includes('done') || statusVal.toLowerCase().includes('complete') || i.state === 'closed';
 
-  // ── COMMITTED: match full label string exactly (handles "Committed: 26Q2" with single colon too) ──
-  // The user's label may be "Committed: 26Q2" (single colon + space) OR "Committed::26Q2"
-  // We store the full label string and match against it directly
-  const isCommitted = S.quarterLabel
-    ? labels.some(l => l === S.quarterLabel || l.replace(/\s*::\s*/g,':: ').trim() === S.quarterLabel.trim())
+  // ── COMMITTED: match quarter label robustly, including parent-group labels ──
+  // Normalize both sides: collapse whitespace around :: and :, lowercase for comparison
+  function normalizeLabel(s) {
+    return s.trim()
+      .replace(/\s*::\s*/g, '::')   // "Committed :: 26Q2" → "Committed::26Q2"
+      .replace(/\s*:\s*/g,  '::')   // "Committed: 26Q2"  → "Committed::26Q2"
+      .toLowerCase();
+  }
+  const qNorm = S.quarterLabel ? normalizeLabel(S.quarterLabel) : '';
+  const isCommitted = qNorm
+    ? labels.some(l => normalizeLabel(l) === qNorm)
     : false;
 
   // MR count: use _mrCount if fetched, else merge_requests_count from payload
@@ -953,15 +972,30 @@ const SCOPED_GROUPS = {
 const ALT_PREFIXES = { component: ['Area', 'Component'] };
 
 function buildSidebar() {
-  // Compute label usage
+  // Compute label usage from ALL issues (including parent-group labels)
   const usage = new Map(); // label string → count
   S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
 
-  // Color map from group labels
+  // Color map: seed from group labels, then fill in any parent-group label colors
+  // from the issue objects themselves (GitLab embeds color in label_details when available)
   const colorMap = new Map();
   S.groupLabels.forEach(l => colorMap.set(l.name, l.color || '#6B7280'));
+  // Also try to pull colors from label_details on issues (if GitLab returns them)
+  S.allIssues.forEach(i => {
+    if (Array.isArray(i.label_details)) {
+      i.label_details.forEach(ld => { if (ld.name && ld.color) colorMap.set(ld.name, ld.color); });
+    }
+  });
 
-  // Scoped filter groups
+  // Helper: generate a deterministic muted color for labels without a known color
+  function fallbackColor(name) {
+    let h = 0;
+    for (let c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+    return `hsl(${Math.abs(h) % 360},35%,52%)`;
+  }
+  function getColor(lbl) { return colorMap.get(lbl) || fallbackColor(lbl); }
+
+  // Scoped filter groups (Status, Priority, Type, Component)
   for (const [key, cfg] of Object.entries(SCOPED_GROUPS)) {
     const prefixes = ALT_PREFIXES[key] || [cfg.prefix];
     const entries = [];
@@ -969,30 +1003,93 @@ function buildSidebar() {
       const idx = lbl.indexOf('::');
       if (idx > 0) {
         const scope = lbl.slice(0, idx);
-        if (prefixes.includes(scope)) entries.push({ lbl, cnt, val: lbl.slice(idx+2) });
+        if (prefixes.some(p => p.toLowerCase() === scope.toLowerCase()))
+          entries.push({ lbl, cnt, val: lbl.slice(idx+2) });
       }
     }
     entries.sort((a,b) => b.cnt - a.cnt);
     if (entries.length === 0) continue;
     document.getElementById(cfg.sec).style.display = '';
     document.getElementById(cfg.cnt).textContent = entries.length;
-    document.getElementById(cfg.el).innerHTML = entries.map(e => filterChipHTML(e.lbl, e.val, e.cnt, colorMap.get(e.lbl))).join('');
+    document.getElementById(cfg.el).innerHTML = entries.map(e => filterChipHTML(e.lbl, e.val, e.cnt, getColor(e.lbl))).join('');
   }
 
-  // Other (non-scoped, non-quarter) labels
-  const scoped_prefixes = new Set(['Status','Priority','Type','Component','Area','Estimate','Committed','Increment','Team','Squad']);
+  // ── QUARTER / COMMITTED filter section ──
+  // Show all labels whose scope matches common quarter-label prefixes (Committed, Increment, Sprint, etc.)
+  // This handles labels that come from parent groups
+  const QUARTER_PREFIXES = ['committed','increment','sprint','quarter','pi','release'];
+  const quarterEntries = [];
+  for (const [lbl, cnt] of usage.entries()) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0) {
+      const scope = lbl.slice(0, idx).toLowerCase().trim();
+      if (QUARTER_PREFIXES.includes(scope))
+        quarterEntries.push({ lbl, cnt, val: lbl.slice(idx+2) });
+    }
+  }
+  quarterEntries.sort((a,b) => b.cnt - a.cnt);
+  let fsQuarter = document.getElementById('fs-quarter');
+  if (!fsQuarter) {
+    // Dynamically insert the Quarter section before the status section
+    const sidebar = document.getElementById('sidebar-filters');
+    const statusSec = document.getElementById('fs-status');
+    const qSec = document.createElement('div');
+    qSec.className = 'filter-section';
+    qSec.id = 'fs-quarter';
+    qSec.style.display = 'none';
+    qSec.innerHTML = `<div class="filter-section-title">Quarter / Increment <span class="filter-section-count" id="fs-quarter-count"></span></div><div id="filter-quarter"></div>`;
+    statusSec ? statusSec.parentNode.insertBefore(qSec, statusSec) : document.querySelector('.sidebar-scroll').prepend(qSec);
+    fsQuarter = qSec;
+  }
+  if (quarterEntries.length) {
+    fsQuarter.style.display = '';
+    document.getElementById('fs-quarter-count').textContent = quarterEntries.length;
+    document.getElementById('filter-quarter').innerHTML = quarterEntries.map(e => filterChipHTML(e.lbl, e.lbl, e.cnt, getColor(e.lbl))).join('');
+  }
+
+  // ── ESTIMATE filter section ──
+  const estimateEntries = [];
+  for (const [lbl, cnt] of usage.entries()) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0 && lbl.slice(0, idx).toLowerCase() === 'estimate')
+      estimateEntries.push({ lbl, cnt, val: lbl.slice(idx+2) });
+  }
+  estimateEntries.sort((a,b) => {
+    // Sort numerically by estimate value where possible
+    const na = parseFloat(a.val), nb = parseFloat(b.val);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.val.localeCompare(b.val);
+  });
+  let fsEstimate = document.getElementById('fs-estimate');
+  if (!fsEstimate) {
+    const qSec2 = document.createElement('div');
+    qSec2.className = 'filter-section';
+    qSec2.id = 'fs-estimate';
+    qSec2.style.display = 'none';
+    qSec2.innerHTML = `<div class="filter-section-title">Estimate <span class="filter-section-count" id="fs-estimate-count"></span></div><div id="filter-estimate"></div>`;
+    document.querySelector('.sidebar-scroll').appendChild(qSec2);
+    fsEstimate = qSec2;
+  }
+  if (estimateEntries.length) {
+    fsEstimate.style.display = '';
+    document.getElementById('fs-estimate-count').textContent = estimateEntries.length;
+    document.getElementById('filter-estimate').innerHTML = estimateEntries.map(e => filterChipHTML(e.lbl, e.val, e.cnt, getColor(e.lbl))).join('');
+  }
+
+  // Other (non-scoped, non-quarter, non-estimate) labels
+  const known_prefixes = new Set(['status','priority','type','component','area','estimate','committed','increment','sprint','quarter','pi','release','team','squad','rank']);
   const otherEntries = [];
   for (const [lbl, cnt] of usage.entries()) {
     const idx = lbl.indexOf('::');
-    if (idx > 0 && scoped_prefixes.has(lbl.slice(0, idx))) continue;
-    if (lbl === S.quarterLabel) continue;
+    if (idx > 0 && known_prefixes.has(lbl.slice(0, idx).toLowerCase())) continue;
+    if (S.quarterLabel && lbl.toLowerCase() === S.quarterLabel.toLowerCase()) continue;
     otherEntries.push({ lbl, cnt });
   }
   otherEntries.sort((a,b) => b.cnt - a.cnt);
   if (otherEntries.length) {
     document.getElementById('fs-other').style.display = '';
     document.getElementById('fs-other-count').textContent = otherEntries.length;
-    document.getElementById('filter-other').innerHTML = otherEntries.slice(0, 30).map(e => filterChipHTML(e.lbl, e.lbl, e.cnt, colorMap.get(e.lbl))).join('');
+    document.getElementById('filter-other').innerHTML = otherEntries.slice(0, 30).map(e => filterChipHTML(e.lbl, e.lbl, e.cnt, getColor(e.lbl))).join('');
   }
 
   // Assignees
@@ -1048,10 +1145,18 @@ function updateClearBtn() {
 function applyFilters() {
   updateClearBtn();
   const term = document.getElementById('search-box').value.toLowerCase();
+
+  // Normalize label for comparison (collapse whitespace around :: and :)
+  function normLbl(s) {
+    return s.trim().replace(/\s*::\s*/g,'::').replace(/\s*:\s*/g,'::').toLowerCase();
+  }
+  const activeNorm = [...S.activeLabels].map(normLbl);
+
   S.filteredIssues = S.allIssues.filter(i => {
     if (term && !i.title.toLowerCase().includes(term) && !String(i.iid).includes(term)) return false;
-    if (S.activeLabels.size > 0) {
-      const has = [...S.activeLabels].every(l => i.labels.includes(l));
+    if (activeNorm.length > 0) {
+      const issueNorm = i.labels.map(normLbl);
+      const has = activeNorm.every(al => issueNorm.includes(al));
       if (!has) return false;
     }
     if (S.activeAssignees.size > 0) {
