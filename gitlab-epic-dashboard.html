@@ -666,6 +666,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
       <div id="panel-assignees" class="tab-panel" style="display:none"></div>
       <div id="panel-labels"   class="tab-panel" style="display:none"></div>
       <div id="panel-risks"    class="tab-panel" style="display:none"></div>
+      <div id="panel-milestones" class="tab-panel" style="display:none"></div>
     </div>
 
   </div>
@@ -678,7 +679,7 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 const S = {
   host: '', groupPath: '', pat: '', quarterLabel: '', role: '',
   epics: [], allIssues: [], filteredIssues: [],
-  groupLabels: [],
+  groupLabels: [], milestones: [], rankMap: new Map(),
   activeLabels: new Set(), activeAssignees: new Set(),
   activeTab: 'overview',
 };
@@ -805,13 +806,35 @@ async function fetchAll() {
   setStatus('Loading group labels…');
   S.groupLabels = await glFetch(`${base}/groups/${enc}/labels?per_page=100`);
 
+  // Build rank map from Rank:: scoped labels on group labels
+  S.rankMap = new Map(); // epic iid → rank number (lower = higher priority)
+  S.groupLabels.forEach(l => {
+    const m = l.name.match(/^Rank::(\d+)$/i);
+    if (m) S.rankMap.set(l.name, parseInt(m[1]));
+  });
+
   setStatus('Loading epics…');
   const epicsRaw = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
+
+  setStatus('Loading milestones…');
+  S.milestones = await glFetch(`${base}/groups/${enc}/milestones?state=active&per_page=100`);
 
   setStatus(`Loading issues for ${epicsRaw.length} epics…`);
   const epicData = await Promise.all(epicsRaw.map(async ep => {
     const issues = await glFetch(`${base}/groups/${enc}/epics/${ep.iid}/issues?per_page=100`);
-    return { epic: ep, issues: issues.map(i => enrichIssue(i)) };
+    // Fetch MR count for each issue in parallel
+    const enriched = await Promise.all(issues.map(async i => {
+      let mrCount = i.merge_requests_count || 0;
+      // If not included in payload, try fetching
+      if (!mrCount && i.project_id && i.iid) {
+        try {
+          const mrs = await glFetch(`${base}/projects/${i.project_id}/issues/${i.iid}/related_merge_requests?per_page=5`);
+          mrCount = Array.isArray(mrs) ? mrs.length : 0;
+        } catch(e) { mrCount = 0; }
+      }
+      return enrichIssue({ ...i, _mrCount: mrCount });
+    }));
+    return { epic: ep, issues: enriched };
   }));
 
   S.epics = epicData;
@@ -843,8 +866,8 @@ function enrichIssue(i) {
   labels.forEach(l => {
     const idx = l.indexOf('::');
     if (idx > 0) {
-      const scope = l.slice(0, idx);
-      const val   = l.slice(idx + 2);
+      const scope = l.slice(0, idx).trim();
+      const val   = l.slice(idx + 2).trim();
       if (!scopedMap[scope]) scopedMap[scope] = [];
       scopedMap[scope].push(val);
     } else {
@@ -852,31 +875,42 @@ function enrichIssue(i) {
     }
   });
 
-  // Estimate from Estimate:: label or time_stats
+  // ── ESTIMATE: try time_stats first, then Estimate:: scoped label ──
+  // Estimate label values can be: "3pd", "3 pd", "1pw", "2 weeks", "5sp" etc.
   let estimatePd = 0;
   if (i.time_stats?.time_estimate) {
     estimatePd = Math.round(i.time_stats.time_estimate / 28800);
-  } else if (scopedMap['Estimate']) {
-    const raw = scopedMap['Estimate'][0] || '';
-    const m = raw.match(/^(\d+)\s*(pd|pw|d|w|sp)?$/i);
+  } else if (scopedMap['Estimate'] && scopedMap['Estimate'].length > 0) {
+    const raw = scopedMap['Estimate'][0].trim();
+    // Match patterns: "3pd", "3 pd", "3d", "1pw", "1w", "2 weeks", "5sp", "8", "3days"
+    const m = raw.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
     if (m) {
-      const n = parseInt(m[1]);
+      const n = parseFloat(m[1]);
       const u = (m[2] || 'pd').toLowerCase();
-      estimatePd = u.startsWith('w') ? n * 5 : n;
+      if (u.startsWith('w')) estimatePd = Math.round(n * 5);
+      else estimatePd = Math.round(n); // pd, d, sp, points all treated as person-days
     }
   }
 
   const statusVal = (scopedMap['Status'] || [])[0] || '';
-  const isBlocked = statusVal.toLowerCase().includes('block') || labels.some(l => l.toLowerCase() === 'blocked');
-  const inReview  = statusVal.toLowerCase().includes('review');
-  const inProgress = statusVal.toLowerCase().includes('progress') || statusVal.toLowerCase().includes('doing');
-  const isDone = statusVal.toLowerCase().includes('done') || statusVal.toLowerCase().includes('complete') || i.state === 'closed';
+  const isBlocked  = statusVal.toLowerCase().includes('block') || labels.some(l => l.toLowerCase() === 'blocked');
+  const inReview   = statusVal.toLowerCase().includes('review');
+  const inProgress = statusVal.toLowerCase().includes('progress') || statusVal.toLowerCase().includes('doing') || statusVal.toLowerCase().includes('wip');
+  const isDone     = statusVal.toLowerCase().includes('done') || statusVal.toLowerCase().includes('complete') || i.state === 'closed';
 
-  const isCommitted = S.quarterLabel ? labels.some(l => l === S.quarterLabel) : false;
+  // ── COMMITTED: match full label string exactly (handles "Committed: 26Q2" with single colon too) ──
+  // The user's label may be "Committed: 26Q2" (single colon + space) OR "Committed::26Q2"
+  // We store the full label string and match against it directly
+  const isCommitted = S.quarterLabel
+    ? labels.some(l => l === S.quarterLabel || l.replace(/\s*::\s*/g,':: ').trim() === S.quarterLabel.trim())
+    : false;
+
+  // MR count: use _mrCount if fetched, else merge_requests_count from payload
+  const mrCount = i._mrCount || i.merge_requests_count || 0;
 
   return {
     ...i,
-    labels,           // normalised string array
+    labels,
     scopedMap,
     plainLabels,
     estimatePd,
@@ -885,6 +919,7 @@ function enrichIssue(i) {
     inProgress,
     isDone,
     isCommitted,
+    mrCount,
   };
 }
 
@@ -974,8 +1009,9 @@ function buildSidebar() {
 }
 
 function filterChipHTML(lbl, displayName, cnt, color) {
-  const dot = color ? `<span class="chip-dot" style="background:${color}"></span>` : `<span class="chip-dot" style="background:#6B7280"></span>`;
-  return `<div class="filter-chip" data-label="${esc(lbl)}" onclick="toggleLabel(this)">
+  const dot = `<span class="chip-dot" style="background:${color||'#6B7280'}"></span>`;
+  // IMPORTANT: data-label must NOT be html-escaped — dataset.label returns raw value
+  return `<div class="filter-chip" data-label="${lbl.replace(/"/g,'&quot;')}" onclick="toggleLabel(this)">
     ${dot}<span class="chip-label">${esc(displayName)}</span><span class="chip-count">${cnt}</span>
   </div>`;
 }
@@ -1031,17 +1067,18 @@ function applyFilters() {
 // TABS
 // ═══════════════════════════════════════════════════════════════════════
 const TAB_DEFS = {
-  PO:  ['overview','issues','labels','risks'],
-  SM:  ['overview','issues','assignees','risks'],
-  DEV: ['issues','assignees','overview'],
-  QA:  ['issues','labels','risks'],
+  PO:  ['overview','issues','milestones','labels','risks'],
+  SM:  ['overview','issues','assignees','milestones','risks'],
+  DEV: ['issues','assignees','milestones','overview'],
+  QA:  ['issues','milestones','labels','risks'],
 };
 const TAB_META = {
-  overview:  { label:'Quarter Overview', icon:'📊' },
-  issues:    { label:'Issues',           icon:'📋' },
-  assignees: { label:'Team Load',        icon:'👥' },
-  labels:    { label:'Label Analysis',   icon:'🏷' },
-  risks:     { label:'Risks & Blockers', icon:'⚠️' },
+  overview:   { label:'Quarter Overview', icon:'📊' },
+  issues:     { label:'Issues',           icon:'📋' },
+  assignees:  { label:'Team Load',        icon:'👥' },
+  labels:     { label:'Label Analysis',   icon:'🏷' },
+  risks:      { label:'Risks & Blockers', icon:'⚠️' },
+  milestones: { label:'Milestones',       icon:'🎯' },
 };
 
 function buildTabs() {
@@ -1072,11 +1109,12 @@ function switchTab(tab) {
 // ═══════════════════════════════════════════════════════════════════════
 function renderAll() {
   const tabs = TAB_DEFS[S.role] || [];
-  if (tabs.includes('overview'))   renderOverview();
-  if (tabs.includes('issues'))     renderIssues();
-  if (tabs.includes('assignees'))  renderAssignees();
-  if (tabs.includes('labels'))     renderLabels();
-  if (tabs.includes('risks'))      renderRisks();
+  if (tabs.includes('overview'))    renderOverview();
+  if (tabs.includes('issues'))      renderIssues();
+  if (tabs.includes('assignees'))   renderAssignees();
+  if (tabs.includes('labels'))      renderLabels();
+  if (tabs.includes('risks'))       renderRisks();
+  if (tabs.includes('milestones'))  renderMilestones();
   updateTabBadges();
 }
 
@@ -1086,6 +1124,7 @@ function updateTabBadges() {
   setBadge('issues', fi.length);
   setBadge('overview', fi.filter(i=>i.isCommitted).length || fi.length);
   setBadge('risks', fi.filter(i=>i.isBlocked).length || '');
+  setBadge('milestones', S.milestones.length || '');
   const assigneeCount = new Set(fi.flatMap(i=>(i.assignees||[]).map(a=>a.id))).size;
   setBadge('assignees', assigneeCount || '');
 }
@@ -1107,14 +1146,13 @@ function renderOverview() {
   const pct     = total ? Math.round(closed/total*100) : 0;
   const color   = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';
 
-  // KPIs
   let kpisHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
-      ${kpiCard('Committed', total, '', 'var(--accent)', `${S.quarterLabel || 'all issues'}`)}
-      ${kpiCard('Closed', closed, '', 'var(--green)', `${pct}% complete`)}
-      ${kpiCard('Open', open, '', open>0?'var(--blue)':'var(--green)', `${committed.filter(i=>i.inProgress).length} in progress`)}
+      ${kpiCard('Committed', total, '', 'var(--accent)', S.quarterLabel || 'all issues')}
+      ${kpiCard('Closed', closed, '', 'var(--green)', pct+'% complete')}
+      ${kpiCard('Open', open, '', open>0?'var(--blue)':'var(--green)', committed.filter(i=>i.inProgress).length+' in progress')}
       ${kpiCard('Blocked', blocked, '⚠', blocked>0?'var(--red)':'var(--muted)', blocked>0?'needs attention':'all clear')}
-      ${kpiCard('Est. Total', totalPd?totalPd+'pd':'—', '', 'var(--blue)', donePd?`${donePd}pd done`:'none closed yet')}
+      ${kpiCard('Est. Total', totalPd?totalPd+'pd':'—', '', 'var(--blue)', donePd?donePd+'pd done':'none closed yet')}
       ${kpiCard('No Estimate', noEst, '!', noEst>0?'var(--yellow)':'var(--muted)', 'missing estimate')}
       ${kpiCard('Unassigned', noAss, '', noAss>0?'var(--yellow)':'var(--muted)', 'no assignee')}
     </div>`;
@@ -1134,26 +1172,60 @@ function renderOverview() {
       </div>
     </div>`;
 
-  // Epics summary
-  kpisHTML += `<div style="font-size:13px;font-weight:600;margin-bottom:12px">Epics (${S.epics.length})</div>
+  // ── Sort epics by Rank:: label on the epic itself ──
+  // Epic labels come from epic.labels (array of strings on epic object)
+  function getEpicRank(ep) {
+    const epicLabels = Array.isArray(ep.labels) ? ep.labels.map(l => typeof l==='string'?l:l.name) : [];
+    for (const lbl of epicLabels) {
+      const m = lbl.match(/^Rank::(\d+)$/i);
+      if (m) return parseInt(m[1]);
+    }
+    return 9999;
+  }
+
+  const sortedEpics = [...S.epics].sort((a, b) => getEpicRank(a.epic) - getEpicRank(b.epic));
+
+  kpisHTML += `<div style="font-size:13px;font-weight:600;margin-bottom:12px">Epics (${sortedEpics.length})</div>
     <div class="epic-grid">`;
 
-  S.epics.forEach(({epic, issues}) => {
+  sortedEpics.forEach(({epic, issues}) => {
     const filtered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
-    if (filtered.length === 0) return;
-    const epicClosed = filtered.filter(i=>i.state==='closed').length;
-    const epicPct    = filtered.length ? Math.round(epicClosed/filtered.length*100) : 0;
-    const epicPd     = filtered.reduce((s,i)=>s+(i.estimatePd||0),0);
-    const epicBlocked= filtered.filter(i=>i.isBlocked).length;
-    const epicPcol   = epicPct>=75?'var(--green)':epicPct>=40?'var(--yellow)':'var(--accent)';
+    const isEmpty  = filtered.length === 0;
 
-    // Collect label chips (Status values for this epic)
+    // Get all issues for this epic (not just filtered) to detect truly empty epics
+    const hasAnyIssues = issues.length > 0;
+
+    const epicClosed  = filtered.filter(i=>i.state==='closed').length;
+    const epicPct     = filtered.length ? Math.round(epicClosed/filtered.length*100) : 0;
+    const epicPd      = filtered.reduce((s,i)=>s+(i.estimatePd||0),0);
+    const epicBlocked = filtered.filter(i=>i.isBlocked).length;
+    const epicPcol    = epicPct>=75?'var(--green)':epicPct>=40?'var(--yellow)':'var(--accent)';
+
+    // Rank label
+    const epicLabels = Array.isArray(epic.labels) ? epic.labels.map(l=>typeof l==='string'?l:l.name) : [];
+    const rankLabel  = epicLabels.find(l=>/^Rank::/i.test(l));
+    const rankNum    = rankLabel ? rankLabel.replace(/^Rank::/i,'') : null;
+
+    // ── Empty epic: red border warning ──
+    const borderStyle = !hasAnyIssues
+      ? 'border-color:#EF444466;background:rgba(239,68,68,0.04)'
+      : '';
+
+    const emptyBanner = !hasAnyIssues
+      ? `<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,0.1);border-radius:6px;padding:4px 8px;margin-bottom:10px">⚠ No issues linked to this epic</div>`
+      : '';
+
     const statusVals = [...new Set(filtered.flatMap(i=>i.scopedMap['Status']||[]))].slice(0,3);
 
     kpisHTML += `
-      <div class="epic-card">
-        <a href="${epic.web_url}" target="_blank" class="epic-title">${esc(epic.title)}</a>
+      <div class="epic-card" style="${borderStyle}">
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px">
+          ${rankNum ? `<span style="font-family:var(--mono);font-size:10px;background:rgba(252,109,38,0.15);color:var(--accent);padding:2px 7px;border-radius:10px;flex-shrink:0;margin-top:2px">#${rankNum}</span>` : ''}
+          <a href="${epic.web_url}" target="_blank" class="epic-title" style="margin-bottom:0">${esc(epic.title)}</a>
+        </div>
         <div class="epic-meta">#${epic.iid} · ${filtered.length} issues</div>
+        ${emptyBanner}
+        ${!isEmpty ? `
         <div class="epic-stats">
           <span class="epic-stat" style="color:var(--green)">✓ ${epicClosed} closed</span>
           <span class="epic-stat" style="color:var(--blue)">◷ ${filtered.length - epicClosed} open</span>
@@ -1165,6 +1237,7 @@ function renderOverview() {
         </div>
         <div style="font-size:10px;color:${epicPcol};text-align:right;margin-top:4px;font-family:var(--mono)">${epicPct}%</div>
         ${statusVals.length ? `<div class="epic-labels">${statusVals.map(v=>`<span class="label-chip" style="background:#374151">${esc(v)}</span>`).join('')}</div>` : ''}
+        ` : ''}
       </div>`;
   });
   kpisHTML += '</div>';
@@ -1184,46 +1257,54 @@ function kpiCard(label, value, icon, color, sub) {
 // ISSUES TAB
 // ═══════════════════════════════════════════════════════════════════════
 function renderIssues() {
-  const colorMap = new Map();
-  S.groupLabels.forEach(l => colorMap.set(l.name, l.color || '#6B7280'));
+  function getEpicRank(ep) {
+    const epicLabels = Array.isArray(ep.labels) ? ep.labels.map(l=>typeof l==='string'?l:l.name) : [];
+    for (const lbl of epicLabels) { const m=lbl.match(/^Rank::(\d+)$/i); if(m) return parseInt(m[1]); }
+    return 9999;
+  }
+  const sortedEpics = [...S.epics].sort((a,b) => getEpicRank(a.epic) - getEpicRank(b.epic));
 
   let html = '';
-  S.epics.forEach(({epic, issues}) => {
+  sortedEpics.forEach(({epic, issues}) => {
     const filtered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
     if (!filtered.length) return;
 
-    const closed = filtered.filter(i=>i.state==='closed').length;
+    const closed  = filtered.filter(i=>i.state==='closed').length;
     const blocked = filtered.filter(i=>i.isBlocked).length;
+    const totalPd = filtered.reduce((s,i)=>s+(i.estimatePd||0),0);
+
+    const epicLabels = Array.isArray(epic.labels) ? epic.labels.map(l=>typeof l==='string'?l:l.name) : [];
+    const rankLabel  = epicLabels.find(l=>/^Rank::/i.test(l));
+    const rankNum    = rankLabel ? rankLabel.replace(/^Rank::/i,'') : null;
+    const rankBadge  = rankNum ? `<span style="font-family:var(--mono);font-size:10px;background:rgba(252,109,38,0.15);color:var(--accent);padding:1px 6px;border-radius:8px">#${rankNum}</span>` : '';
 
     html += `
       <div class="issue-group" id="ig-${epic.iid}">
         <div class="issue-group-header" onclick="toggleGroup('ig-${epic.iid}')">
           <span class="collapse-icon">▾</span>
+          ${rankBadge}
           <span class="issue-group-title">${esc(epic.title)}</span>
-          <span class="issue-group-meta">${closed}/${filtered.length} closed${blocked?` · ${blocked} blocked`:''}</span>
-          <a href="${epic.web_url}" target="_blank" onclick="e=>e.stopPropagation()" style="font-size:11px;color:var(--muted);text-decoration:none;margin-left:8px">↗</a>
+          <span class="issue-group-meta">${closed}/${filtered.length} closed${blocked?` · ⚠${blocked} blocked`:''}${totalPd?` · ${totalPd}pd`:''}</span>
+          <a href="${epic.web_url}" target="_blank" style="font-size:11px;color:var(--muted);text-decoration:none;margin-left:8px" onclick="event.stopPropagation()">↗</a>
         </div>
         <div class="issue-list">`;
 
     filtered.forEach(i => {
       const assigneeImgs = (i.assignees||[]).slice(0,3).map(a =>
-        a.avatar_url ? `<img src="${a.avatar_url}" title="${esc(a.name||a.username)}" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--bg);margin-left:-4px">` :
-        `<div style="width:18px;height:18px;border-radius:50%;background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;font-size:8px;margin-left:-4px;">${(a.name||'?')[0]}</div>`
+        a.avatar_url
+          ? `<img src="${a.avatar_url}" title="${esc(a.name||a.username)}" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--bg);margin-left:-4px">`
+          : `<div style="width:18px;height:18px;border-radius:50%;background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;font-size:8px;margin-left:-4px;">${(a.name||'?')[0]}</div>`
       ).join('');
 
-      // Status badge
-      const statusVal = (i.scopedMap['Status']||[])[0] || '';
       let statusBadge = '';
-      if (i.isBlocked) statusBadge = '<span class="badge badge-blocked">Blocked</span>';
-      else if (i.inReview) statusBadge = '<span class="badge badge-review">Review</span>';
-      else if (i.state === 'closed') statusBadge = '<span class="badge badge-done">Done</span>';
-      else if (i.inProgress) statusBadge = '<span class="badge badge-inprogress">In Progress</span>';
+      if (i.isBlocked)             statusBadge = '<span class="badge badge-blocked">Blocked</span>';
+      else if (i.inReview)         statusBadge = '<span class="badge badge-review">Review</span>';
+      else if (i.state==='closed') statusBadge = '<span class="badge badge-done">Done</span>';
+      else if (i.inProgress)       statusBadge = '<span class="badge badge-inprogress">In Progress</span>';
 
-      // Type label
-      const typeVal = (i.scopedMap['Type']||[])[0] || '';
+      const typeVal     = (i.scopedMap['Type']||[])[0] || '';
       const priorityVal = (i.scopedMap['Priority']||[])[0] || '';
-
-      const labelChips = [];
+      const labelChips  = [];
       if (typeVal) labelChips.push(`<span class="badge" style="background:rgba(20,184,166,0.12);color:var(--teal);border:1px solid rgba(20,184,166,0.25)">${esc(typeVal)}</span>`);
       if (priorityVal) {
         const pc = priorityVal.toLowerCase().includes('high')?'var(--red)':priorityVal.toLowerCase().includes('med')?'var(--yellow)':'var(--muted)';
@@ -1238,7 +1319,7 @@ function renderIssues() {
           <div class="issue-chips">
             ${statusBadge}
             ${labelChips.join('')}
-            ${i.merge_requests_count ? '<span class="badge badge-mr">MR</span>' : ''}
+            ${i.mrCount ? `<span class="badge badge-mr">MR ×${i.mrCount}</span>` : ''}
             ${i.estimatePd ? `<span class="est-label">${i.estimatePd}pd</span>` : ''}
             <div style="display:flex;margin-left:4px">${assigneeImgs}</div>
           </div>
@@ -1420,7 +1501,101 @@ function renderRisks() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// UTILS
+// MILESTONES TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderMilestones() {
+  const milestones = S.milestones || [];
+
+  // Map issues to their milestone
+  const msIssues = new Map(); // milestone id → issues[]
+  S.filteredIssues.forEach(i => {
+    if (!i.milestone) return;
+    const mid = i.milestone.id;
+    if (!msIssues.has(mid)) msIssues.set(mid, []);
+    msIssues.get(mid).push(i);
+  });
+
+  // Sort milestones: by due_date asc, no-date last
+  const sorted = [...milestones].sort((a,b) => {
+    if (!a.due_date && !b.due_date) return 0;
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return new Date(a.due_date) - new Date(b.due_date);
+  });
+
+  const now = new Date();
+  const totalMs = sorted.length;
+  const withIssues = sorted.filter(m => msIssues.has(m.id)).length;
+
+  let html = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+      ${kpiCard('Milestones', totalMs, '', 'var(--blue)', 'active')}
+      ${kpiCard('With Issues', withIssues, '', 'var(--green)', 'in filtered view')}
+      ${kpiCard('Upcoming', sorted.filter(m=>m.due_date && new Date(m.due_date)>now).length, '', 'var(--accent)', 'not yet due')}
+      ${kpiCard('Overdue', sorted.filter(m=>m.due_date && new Date(m.due_date)<now && m.state!=='closed').length, '!', 'var(--red)', 'past due date')}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">`;
+
+  if (sorted.length === 0) {
+    html += `<div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">No active milestones found</div></div>`;
+  }
+
+  sorted.forEach(m => {
+    const issues   = msIssues.get(m.id) || [];
+    const closed   = issues.filter(i=>i.state==='closed').length;
+    const open     = issues.length - closed;
+    const totalPd  = issues.reduce((s,i)=>s+(i.estimatePd||0),0);
+    const pct      = issues.length ? Math.round(closed/issues.length*100) : 0;
+    const dueDate  = m.due_date ? new Date(m.due_date) : null;
+    const isOver   = dueDate && dueDate < now;
+    const daysLeft = dueDate ? Math.ceil((dueDate-now)/(1000*60*60*24)) : null;
+    const pctColor = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--blue)';
+    const borderCol = isOver ? '#EF444444' : 'var(--border)';
+
+    let dueBadge = '';
+    if (!dueDate) {
+      dueBadge = `<span style="font-size:11px;color:var(--muted)">No due date</span>`;
+    } else if (isOver) {
+      dueBadge = `<span style="font-size:11px;color:var(--red);background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:10px">⚠ Overdue · ${m.due_date}</span>`;
+    } else if (daysLeft <= 14) {
+      dueBadge = `<span style="font-size:11px;color:var(--yellow);background:rgba(234,179,8,0.1);padding:2px 8px;border-radius:10px">⏳ ${daysLeft}d left · ${m.due_date}</span>`;
+    } else {
+      dueBadge = `<span style="font-size:11px;color:var(--muted)">📅 ${m.due_date} · ${daysLeft}d left</span>`;
+    }
+
+    html += `
+      <div style="background:var(--surface);border:1px solid ${borderCol};border-radius:14px;overflow:hidden">
+        <div style="padding:14px 18px;background:var(--surface2);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <a href="${m.web_url||'#'}" target="_blank" style="font-size:14px;font-weight:600;color:var(--text);text-decoration:none;flex:1" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text)'">${esc(m.title)}</a>
+          ${dueBadge}
+          <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${issues.length} issues · ${totalPd||0}pd</span>
+        </div>
+        ${issues.length ? `
+        <div style="padding:10px 18px 4px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+            <span>${closed} closed · ${open} open</span>
+            <span style="color:${pctColor};font-family:var(--mono)">${pct}%</span>
+          </div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${pctColor}"></div></div>
+        </div>
+        <div style="max-height:200px;overflow-y:auto">
+          ${issues.map(i=>`
+            <a href="${i.web_url}" target="_blank" class="issue-row" style="padding:7px 18px">
+              <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0">#${i.iid}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(i.title)}</span>
+              ${i.isBlocked?'<span class="badge badge-blocked">Blocked</span>':''}
+              ${i.estimatePd?`<span class="est-label">${i.estimatePd}pd</span>`:''}
+            </a>`).join('')}
+        </div>` : `<div style="padding:12px 18px;font-size:12px;color:var(--muted)">No matching issues in this milestone</div>`}
+      </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('panel-milestones').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════════════
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
