@@ -784,15 +784,15 @@ async function fetchAll() {
   const epicsRaw = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
 
   setStatus('Loading milestones…');
-  const allMilestones = await glFetch(`${base}/groups/${enc}/milestones?per_page=100`);
-  // Keep only milestones active OR closed within last 3 months
+  // Fetch active milestones + recently-due ones in one call by fetching all and filtering client-side
+  // Rule: keep if NOT closed, OR if due_date >= 3 months ago (so recently closed still show)
   const threeMonthsAgo = new Date();
   threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const allMilestones = await glFetch(`${base}/groups/${enc}/milestones?per_page=100`);
   S.milestones = allMilestones.filter(m => {
-    if (m.state === 'active') return true;
-    // closed milestones: keep if closed within 3 months (use updated_at as proxy)
-    if (m.updated_at && new Date(m.updated_at) >= threeMonthsAgo) return true;
-    // also keep if due_date is within 3 months
+    // Always keep non-closed milestones
+    if (m.state !== 'closed') return true;
+    // For closed milestones: only keep if due_date is within last 3 months
     if (m.due_date && new Date(m.due_date) >= threeMonthsAgo) return true;
     return false;
   });
@@ -817,29 +817,40 @@ async function fetchAll() {
   S.allIssues = epicData.flatMap(e => e.issues);
   S.filteredIssues = [...S.allIssues];
 
-  // Build rank map from Rank:: labels found on epics (no group API needed)
-  S.rankMap = new Map();
-  epicsRaw.forEach(ep => {
-    const epLabels = Array.isArray(ep.labels) ? ep.labels.map(l => typeof l==='string'?l:l.name) : [];
-    epLabels.forEach(l => {
-      const m = l.match(/^Rank::(\d+)$/i);
-      if (m) S.rankMap.set(l, parseInt(m[1]));
-    });
-  });
-
-  // Build label color cache from actual label data embedded in issue responses
-  // GitLab epic-issues endpoint returns label_events or label objects with color on some versions
-  // We generate deterministic colors for everything — consistent and no extra API calls
+  // ── Build label color cache from ALL labels: issues + epics ──
   S.labelColorCache = new Map();
   const allLabelNames = new Set();
   S.allIssues.forEach(i => i.labels.forEach(l => allLabelNames.add(l)));
   epicsRaw.forEach(ep => {
-    const epLabels = Array.isArray(ep.labels) ? ep.labels.map(l => typeof l==='string'?l:l.name) : [];
+    const epLabels = Array.isArray(ep.labels) ? ep.labels.map(l => typeof l==='string'?l:l.name).filter(Boolean) : [];
     epLabels.forEach(l => allLabelNames.add(l));
   });
-  allLabelNames.forEach(name => {
-    S.labelColorCache.set(name, autoColor(name));
+  allLabelNames.forEach(name => S.labelColorCache.set(name, autoColor(name)));
+
+  // ── Store epic labels on each epic entry for sidebar use ──
+  S.epics.forEach(entry => {
+    entry.epic._labelsNorm = Array.isArray(entry.epic.labels)
+      ? entry.epic.labels.map(l => typeof l==='string'?l:l.name).filter(Boolean)
+      : [];
   });
+
+  // Debug: log label summary to console so user can verify quarter label spelling
+  const issueLabelScopes = new Map();
+  S.allIssues.forEach(i => i.labels.forEach(l => {
+    const idx = l.indexOf('::');
+    const scope = idx > 0 ? l.slice(0, idx) : '(plain)';
+    if (!issueLabelScopes.has(scope)) issueLabelScopes.set(scope, new Set());
+    issueLabelScopes.get(scope).add(l);
+  }));
+  console.group('EpicDash — Labels found on issues');
+  issueLabelScopes.forEach((lbls, scope) => {
+    console.log(scope + ':', [...lbls].join(', '));
+  });
+  if (S.quarterLabel) {
+    const matched = S.allIssues.filter(i => i.isCommitted).length;
+    console.log(`Quarter label "${S.quarterLabel}" → matched ${matched} issues`);
+  }
+  console.groupEnd();
 }
 
 async function refreshData() {
@@ -908,21 +919,24 @@ function enrichIssue(i) {
     }
   });
 
-  // ── ESTIMATE: time_stats first, then any Estimate:: label (case-insensitive scope match) ──
+  // ── ESTIMATE: time_stats first, then Estimate:: label ──
+  // Scope must match exactly as stored by GitLab (case-sensitive).
+  // We check common casings as fallback since some teams title-case, others don't.
   let estimatePd = 0;
   if (i.time_stats?.time_estimate) {
     estimatePd = Math.round(i.time_stats.time_estimate / 28800);
   } else {
-    // Find any label whose scope is "estimate" (case-insensitive)
+    const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size'];
     let rawEst = null;
     for (const lbl of labels) {
       const idx = lbl.indexOf('::');
-      if (idx > 0 && lbl.slice(0, idx).trim().toLowerCase() === 'estimate') {
+      if (idx > 0 && ESTIMATE_SCOPES.includes(lbl.slice(0, idx).trim())) {
         rawEst = lbl.slice(idx + 2).trim();
         break;
       }
     }
     if (rawEst) {
+      // Match: "3", "3pd", "3 pd", "3d", "1pw", "1w", "2weeks", "5sp", "0.5w"
       const m = rawEst.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
       if (m) {
         const n = parseFloat(m[1]);
@@ -932,12 +946,12 @@ function enrichIssue(i) {
     }
   }
 
-  // ── STATUS ──
-  // Find any label whose scope is "status" (case-insensitive)
+  // ── STATUS: exact scope match with common casings ──
+  const STATUS_SCOPES = ['Status', 'status', 'STATUS', 'Workflow', 'workflow'];
   let statusVal = '';
   for (const lbl of labels) {
     const idx = lbl.indexOf('::');
-    if (idx > 0 && lbl.slice(0, idx).trim().toLowerCase() === 'status') {
+    if (idx > 0 && STATUS_SCOPES.includes(lbl.slice(0, idx).trim())) {
       statusVal = lbl.slice(idx + 2).trim().toLowerCase();
       break;
     }
@@ -991,9 +1005,13 @@ function quarterScope() {
 }
 
 function buildSidebar() {
-  // ── 1. Collect all label usage from actual issues ──
+  // ── 1. Collect label usage from issues AND epics ──
   const usage = new Map(); // full label string → count
   S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
+  // Epic labels: count each epic label once (epics are the parent containers)
+  S.epics.forEach(({epic}) => {
+    (epic._labelsNorm || []).forEach(l => usage.set(l, (usage.get(l)||0)+1));
+  });
 
   // ── 2. Bucket by scope (case-insensitive) ──
   // scopeMap: lowercase-scope → { displayScope, labels: [{lbl, val, cnt}] }
@@ -1190,14 +1208,14 @@ function applyFilters() {
   updateClearBtn();
   const term = document.getElementById('search-box').value.toLowerCase();
 
-  // Normalize label string for robust matching (handle parent-group label formatting)
-  const activeNorm = [...S.activeLabels].map(normLabel);
+  // Labels are EXACT case-sensitive — GitLab labels are case-sensitive.
+  // normLabel is only used for quarter label matching (user types it manually).
+  const activeLabels = [...S.activeLabels];
 
   S.filteredIssues = S.allIssues.filter(i => {
     if (term && !i.title.toLowerCase().includes(term) && !String(i.iid).includes(term)) return false;
-    if (activeNorm.length > 0) {
-      const issueNorm = i.labels.map(normLabel);
-      if (!activeNorm.every(al => issueNorm.includes(al))) return false;
+    if (activeLabels.length > 0) {
+      if (!activeLabels.every(l => i.labels.includes(l))) return false;
     }
     if (S.activeAssignees.size > 0) {
       const ids = new Set((i.assignees||[]).map(a => a.id));
