@@ -769,6 +769,22 @@ async function startLoad() {
   }
 }
 
+// Collect unique non-closed milestones from a list of issues
+function deriveMilestonesFromIssues(issues) {
+  const seen = new Map(); // milestone id → milestone object
+  issues.forEach(i => {
+    if (!i.milestone) return;
+    if (i.milestone.state === 'closed') return;
+    if (!seen.has(i.milestone.id)) seen.set(i.milestone.id, i.milestone);
+  });
+  return [...seen.values()].sort((a, b) => {
+    if (!a.due_date && !b.due_date) return 0;
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return new Date(a.due_date) - new Date(b.due_date);
+  });
+}
+
 // Extract labels array from an epic
 function getEpicLabels(ep) {
   return Array.isArray(ep.labels)
@@ -782,16 +798,6 @@ async function fetchAll() {
 
   setStatus('Loading epics…');
   const allEpicsRaw = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
-
-  setStatus('Loading milestones…');
-  // Only milestones with due_date within last 3 months or in the future
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  const allMilestones = await glFetch(`${base}/groups/${enc}/milestones?per_page=100`);
-  S.milestones = allMilestones.filter(m => {
-    if (!m.due_date) return false;
-    return new Date(m.due_date) >= threeMonthsAgo;
-  });
 
   setStatus(`Loading issues for ${allEpicsRaw.length} epic(s)…`);
   const epicData = await Promise.all(allEpicsRaw.map(async ep => {
@@ -816,6 +822,9 @@ async function fetchAll() {
   // Initial state: everything visible
   S.filteredEpics  = [...S.allEpics];
   S.filteredIssues = [...S.allIssues];
+
+  // Derive milestones from issues — collect unique non-closed milestones referenced by issues
+  S.milestones = deriveMilestonesFromIssues(S.filteredIssues);
 
   // Build label color cache from all labels (issues + epics)
   S.labelColorCache = new Map();
@@ -1200,6 +1209,9 @@ function applyFilters() {
     }
     return true;
   });
+
+  // 4. Re-derive milestones from the now-filtered issues
+  S.milestones = deriveMilestonesFromIssues(S.filteredIssues);
 
   renderAll();
 }
@@ -1686,43 +1698,34 @@ function renderRisks() {
 // MILESTONES TAB
 // ═══════════════════════════════════════════════════════════════════════
 function renderMilestones() {
-  const milestones = S.milestones || [];
+  const milestones = S.milestones || []; // already sorted, non-closed, from filteredIssues
 
-  // Map issues to their milestone
-  const msIssues = new Map(); // milestone id → issues[]
+  // Map milestone id → issues (from filteredIssues)
+  const msIssues = new Map();
+  milestones.forEach(m => msIssues.set(m.id, []));
   S.filteredIssues.forEach(i => {
     if (!i.milestone) return;
-    const mid = i.milestone.id;
-    if (!msIssues.has(mid)) msIssues.set(mid, []);
-    msIssues.get(mid).push(i);
-  });
-
-  // Sort milestones: by due_date asc, no-date last
-  const sorted = [...milestones].sort((a,b) => {
-    if (!a.due_date && !b.due_date) return 0;
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    return new Date(a.due_date) - new Date(b.due_date);
+    if (msIssues.has(i.milestone.id)) msIssues.get(i.milestone.id).push(i);
   });
 
   const now = new Date();
-  const totalMs = sorted.length;
-  const withIssues = sorted.filter(m => msIssues.has(m.id)).length;
+  const totalMs = milestones.length;
+  const withIssues = milestones.filter(m => msIssues.get(m.id)?.length > 0).length;
 
   let html = `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
       ${kpiCard('Milestones', totalMs, '', 'var(--blue)', 'active')}
       ${kpiCard('With Issues', withIssues, '', 'var(--green)', 'in filtered view')}
-      ${kpiCard('Upcoming', sorted.filter(m=>m.due_date && new Date(m.due_date)>now).length, '', 'var(--accent)', 'not yet due')}
-      ${kpiCard('Overdue', sorted.filter(m=>m.due_date && new Date(m.due_date)<now && m.state!=='closed').length, '!', 'var(--red)', 'past due date')}
+      ${kpiCard('Upcoming', milestones.filter(m=>m.due_date && new Date(m.due_date)>now).length, '', 'var(--accent)', 'not yet due')}
+      ${kpiCard('Overdue', milestones.filter(m=>m.due_date && new Date(m.due_date)<now).length, '!', 'var(--red)', 'past due date')}
     </div>
     <div style="display:flex;flex-direction:column;gap:14px">`;
 
-  if (sorted.length === 0) {
+  if (milestones.length === 0) {
     html += `<div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">No active milestones found</div></div>`;
   }
 
-  sorted.forEach(m => {
+  milestones.forEach(m => {
     const issues   = msIssues.get(m.id) || [];
     const closed   = issues.filter(i=>i.state==='closed').length;
     const open     = issues.length - closed;
