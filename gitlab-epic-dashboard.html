@@ -567,10 +567,12 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
     </div>
     <div class="field-group">
       <label class="field-label">Quarter Labels <span style="color:var(--muted);font-size:10px;font-weight:400;text-transform:none;letter-spacing:0">(press Enter or comma to add — e.g. Committed::26Q2)</span></label>
-      <div id="ql-tags" style="display:flex;flex-wrap:wrap;gap:6px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;min-height:44px;cursor:text;transition:border-color 0.2s" onclick="document.getElementById('ql-input').focus()"></div>
-      <input id="ql-input" type="text" placeholder="Type a label and press Enter…" autocomplete="off"
-        style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--sans);font-size:13px;margin-top:6px;padding:0 4px"
-        onkeydown="qlKeydown(event)" oninput="qlInputHint()"/>
+      <div id="ql-tags" onclick="document.getElementById('ql-input').focus()"
+        style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;min-height:44px;cursor:text;transition:border-color 0.2s">
+        <input id="ql-input" type="text" placeholder="Type a label and press Enter…" autocomplete="off"
+          style="flex:1;min-width:160px;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--sans);font-size:13px;cursor:text;padding:0"
+          onkeydown="qlKeydown(event)" oninput="qlInputHint()"/>
+      </div>
       <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
         <span style="font-size:11px;color:var(--muted)">Match mode:</span>
         <button id="ql-and" class="ql-mode-btn ql-mode-active" onclick="setQlMode('AND')">AND — all labels</button>
@@ -748,14 +750,15 @@ function changeConfig() {
 function qlAddTag(label) {
   label = label.trim();
   if (!label) return;
-  // Prevent duplicates
   const existing = [...document.querySelectorAll('#ql-tags .ql-tag')].map(t => t.dataset.label);
   if (existing.includes(label)) return;
   const tag = document.createElement('span');
   tag.className = 'ql-tag';
   tag.dataset.label = label;
   tag.innerHTML = '<span>' + esc(label) + '</span><span class="ql-tag-remove" onclick="this.parentElement.remove()">×</span>';
-  document.getElementById('ql-tags').appendChild(tag);
+  // Insert before the input so tags appear to the left of the cursor
+  const input = document.getElementById('ql-input');
+  document.getElementById('ql-tags').insertBefore(tag, input);
 }
 
 function qlKeydown(e) {
@@ -889,8 +892,15 @@ async function fetchAll() {
   console.groupEnd();
 
   setStatus('Loading milestones…');
-  // Active milestones only — closed milestones are history
-  S.milestones = await glFetch(`${base}/groups/${enc}/milestones?state=active&per_page=100`);
+  // Rule: show milestone only if due_date exists AND due_date >= 3 months ago
+  // This removes stale old milestones while keeping current + upcoming ones
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+  const allMilestones = await glFetch(`${base}/groups/${enc}/milestones?per_page=100`);
+  S.milestones = allMilestones.filter(m => {
+    if (!m.due_date) return false; // no due date → exclude
+    return new Date(m.due_date) >= threeMonthsAgo;
+  });
 
   setStatus(`Loading issues for ${epicsForQuarter.length} epic(s)…`);
   const epicData = await Promise.all(epicsForQuarter.map(async ep => {
@@ -1075,19 +1085,29 @@ function quarterScope() {
 }
 
 function buildSidebar() {
-  // ── 1. Collect label usage from issues AND epics ──
+  // ── Decide label source based on active tab ──
+  // overview / milestones / risks / labels → epic-level labels only
+  // issues / assignees → issue-level labels only
+  const EPIC_TABS  = new Set(['overview','milestones','risks','labels','assignees']);
+  const ISSUE_TABS = new Set(['issues']);
+  const useEpicLabels  = EPIC_TABS.has(S.activeTab);
+  const useIssueLabels = ISSUE_TABS.has(S.activeTab);
+
+  // ── 1. Collect label usage ──
   const usage = new Map();
-  S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
-  // Epic labels counted once per epic
-  S.epics.forEach(({epic}) => {
-    (epic._labels||[]).forEach(l => usage.set(l, (usage.get(l)||0)+1));
-  });
+  if (useEpicLabels) {
+    // Only epic labels — one count per epic
+    S.epics.forEach(({epic}) => {
+      (epic._labels||[]).forEach(l => usage.set(l, (usage.get(l)||0)+1));
+    });
+  } else {
+    // Only issue labels
+    S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
+  }
 
-  // ── 2. Bucket by scope (case-insensitive) ──
-  // scopeMap: lowercase-scope → { displayScope, labels: [{lbl, val, cnt}] }
+  // ── 2. Bucket by scope ──
   const scopeMap = new Map();
-  const plainLabels = []; // no "::" labels
-
+  const plainLabels = [];
   for (const [lbl, cnt] of usage.entries()) {
     const idx = lbl.indexOf('::');
     if (idx > 0) {
@@ -1100,88 +1120,78 @@ function buildSidebar() {
       plainLabels.push({ lbl, cnt });
     }
   }
-
-  // Sort labels within each scope by count desc
   scopeMap.forEach(({labels}) => labels.sort((a,b) => b.cnt - a.cnt));
 
+  // ── 3. Sort scopes: quarter scope first, then known order, then alpha ──
   const qScope = quarterScope();
-
-  // ── 3. Render scope sections ──
-  const scroll = document.querySelector('.sidebar-scroll');
-  // Remove all dynamically generated filter sections (keep static ones we'll rebuild)
-  scroll.querySelectorAll('.filter-section-dynamic').forEach(el => el.remove());
-
-  // Scope display order: quarter scope first, then common ones, then alpha
   const PRIORITY_ORDER = ['committed','increment','status','priority','type','component','area','estimate'];
-  const allScopeKeys = [...scopeMap.keys()];
-  allScopeKeys.sort((a, b) => {
-    const ai = a === qScope ? -1 : PRIORITY_ORDER.indexOf(a);
-    const bi = b === qScope ? -1 : PRIORITY_ORDER.indexOf(b);
-    const av = ai === -1 ? (a === qScope ? -2 : 999) : ai;
-    const bv = bi === -1 ? (b === qScope ? -2 : 999) : bi;
-    if (av !== bv) return av - bv;
-    return a.localeCompare(b);
+  const allScopeKeys = [...scopeMap.keys()].sort((a, b) => {
+    const av = a === qScope ? -2 : (PRIORITY_ORDER.indexOf(a) >= 0 ? PRIORITY_ORDER.indexOf(a) : 999);
+    const bv = b === qScope ? -2 : (PRIORITY_ORDER.indexOf(b) >= 0 ? PRIORITY_ORDER.indexOf(b) : 999);
+    return av !== bv ? av - bv : a.localeCompare(b);
   });
 
-  const clearBtn = document.getElementById('clear-btn');
+  // ── 4. Render ──
+  const scroll = document.querySelector('.sidebar-scroll');
+  scroll.querySelectorAll('.filter-section-dynamic').forEach(el => el.remove());
   const assigneesSection = document.getElementById('fs-assignees');
+
+  // Context label showing which source is active
+  const ctxNote = document.createElement('div');
+  ctxNote.className = 'filter-section-dynamic';
+  ctxNote.style.cssText = 'font-size:10px;color:var(--muted);padding:4px 4px 8px;letter-spacing:0.05em;text-transform:uppercase';
+  ctxNote.textContent = useEpicLabels ? '⬡ Epic filters' : '◈ Issue filters';
+  scroll.insertBefore(ctxNote, assigneesSection);
 
   allScopeKeys.forEach(scopeKey => {
     const { displayScope, labels } = scopeMap.get(scopeKey);
     const isHidden = S.hiddenScopes.has(scopeKey);
-    const isDefault = DEFAULT_HIDDEN_SCOPES.has(scopeKey) && !S.hiddenScopes.has('__restored__'+scopeKey);
-
     const sec = document.createElement('div');
     sec.className = 'filter-section filter-section-dynamic';
     sec.dataset.scope = scopeKey;
 
-    const isCollapsed = isHidden;
-    const eyeIcon = isCollapsed ? '👁‍🗨' : '👁';
-    const titleHTML = `
+    const eyeIcon = isHidden ? '👁‍🗨' : '👁';
+    sec.innerHTML = `
       <div class="filter-section-title">
         ${esc(displayScope)}
         <span style="display:flex;align-items:center;gap:6px">
           <span class="filter-section-count">${labels.length}</span>
-          <span style="cursor:pointer;font-size:10px;opacity:0.6;user-select:none" title="${isCollapsed?'Show':'Hide'} this scope" onclick="toggleScopeVisibility('${scopeKey}',this)">${eyeIcon}</span>
+          <span style="cursor:pointer;font-size:10px;opacity:0.6;user-select:none"
+            title="${isHidden?'Show':'Hide'} this scope"
+            onclick="toggleScopeVisibility('${scopeKey.replace(/'/g,"\\'")}',this)">${eyeIcon}</span>
         </span>
-      </div>`;
-
-    if (isCollapsed) {
-      sec.innerHTML = titleHTML + `<div style="font-size:10px;color:var(--muted);padding:2px 4px 6px">Hidden — click 👁‍🗨 to show</div>`;
-    } else {
-      sec.innerHTML = titleHTML +
-        `<div id="fscope-${scopeKey}">` +
-        labels.map(e => filterChipHTML(e.lbl, e.val, e.cnt, S.labelColorCache.get(e.lbl) || autoColor(e.lbl))).join('') +
-        `</div>`;
-    }
-
-    // Insert before assignees section
+      </div>` +
+      (isHidden
+        ? `<div style="font-size:10px;color:var(--muted);padding:2px 4px 6px">Hidden — click 👁‍🗨 to show</div>`
+        : `<div id="fscope-${scopeKey}">${labels.map(e => filterChipHTML(e.lbl, e.val, e.cnt, S.labelColorCache.get(e.lbl)||autoColor(e.lbl))).join('')}</div>`
+      );
     scroll.insertBefore(sec, assigneesSection);
   });
 
-  // ── 4. Plain (non-scoped) labels ──
+  // Plain labels
   if (plainLabels.length) {
     plainLabels.sort((a,b) => b.cnt - a.cnt);
+    const isHidden = S.hiddenScopes.has('__plain__');
     const sec = document.createElement('div');
     sec.className = 'filter-section filter-section-dynamic';
     sec.dataset.scope = '__plain__';
-    const isCollapsed = S.hiddenScopes.has('__plain__');
     sec.innerHTML = `
       <div class="filter-section-title">
         Labels
         <span style="display:flex;align-items:center;gap:6px">
           <span class="filter-section-count">${plainLabels.length}</span>
-          <span style="cursor:pointer;font-size:10px;opacity:0.6;user-select:none" title="${isCollapsed?'Show':'Hide'}" onclick="toggleScopeVisibility('__plain__',this)">${isCollapsed?'👁‍🗨':'👁'}</span>
+          <span style="cursor:pointer;font-size:10px;opacity:0.6;user-select:none"
+            onclick="toggleScopeVisibility('__plain__',this)">${isHidden?'👁‍🗨':'👁'}</span>
         </span>
       </div>` +
-      (isCollapsed
+      (isHidden
         ? `<div style="font-size:10px;color:var(--muted);padding:2px 4px 6px">Hidden — click 👁‍🗨 to show</div>`
         : `<div>${plainLabels.slice(0,50).map(e => filterChipHTML(e.lbl, e.lbl, e.cnt, S.labelColorCache.get(e.lbl)||autoColor(e.lbl))).join('')}</div>`
       );
     scroll.insertBefore(sec, assigneesSection);
   }
 
-  // ── 5. Assignees ──
+  // ── 5. Assignees (always from issues regardless of tab) ──
   const aMap = new Map();
   S.allIssues.forEach(i => (i.assignees||[]).forEach(a => {
     if (!aMap.has(a.id)) aMap.set(a.id, {a, cnt:0});
@@ -1335,6 +1345,8 @@ function switchTab(tab) {
   document.getElementById(`panel-${tab}`).style.display = 'block';
   document.getElementById(`panel-${tab}`).classList.add('active');
   S.activeTab = tab;
+  // Sidebar filters depend on active tab context (epic labels vs issue labels)
+  buildSidebar();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
