@@ -236,12 +236,29 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
   border: 1px solid transparent;
 }
 .filter-chip:hover { background: var(--surface2); }
-.filter-chip.active { background: rgba(252,109,38,0.1); border-color: rgba(252,109,38,0.25); color: var(--accent); }
+.filter-chip.active  { background: rgba(252,109,38,0.1); border-color: rgba(252,109,38,0.25); color: var(--accent); }
+.filter-chip.exclude { background: rgba(239,68,68,0.1);  border-color: rgba(239,68,68,0.3);   color: var(--red); }
 .filter-chip .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .filter-chip .chip-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-chip .chip-count { font-size: 10px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
-.filter-chip.active .chip-count { color: var(--accent); }
-.avatar-sm { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.filter-chip.active .chip-count  { color: var(--accent); }
+.filter-chip.exclude .chip-count { color: var(--red); }
+.filter-chip .chip-mode { font-size: 10px; font-weight: 700; width: 12px; text-align: center; flex-shrink: 0; }
+/* Saved filters */
+.saved-filter-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 6px; border-radius: 7px; font-size: 12px;
+  background: var(--surface2); border: 1px solid var(--border); margin-bottom: 4px;
+}
+.saved-filter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.saved-filter-btn {
+  background: none; border: none; cursor: pointer; font-size: 11px;
+  padding: 2px 6px; border-radius: 5px; font-family: var(--sans);
+}
+.saved-filter-apply { color: var(--accent); }
+.saved-filter-apply:hover { background: rgba(252,109,38,0.12); }
+.saved-filter-del { color: var(--muted); }
+.saved-filter-del:hover { color: var(--red); }
 .avatar-placeholder { width: 20px; height: 20px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); flex-shrink: 0; }
 .clear-filters-btn {
   width: 100%;
@@ -612,6 +629,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
       <div class="sidebar-scroll">
         <button class="clear-filters-btn" onclick="clearFilters()" id="clear-btn" style="display:none">✕ Clear filters</button>
 
+        <!-- Saved Filters -->
+        <div class="filter-section" id="fs-saved">
+          <div class="filter-section-title">
+            Saved Filters
+            <button onclick="saveCurrentFilters()" title="Save current filters"
+              style="background:rgba(252,109,38,0.12);border:1px solid rgba(252,109,38,0.3);color:var(--accent);border-radius:5px;padding:1px 8px;font-size:10px;cursor:pointer;font-family:var(--sans)">+ Save</button>
+          </div>
+          <div id="saved-filters-list"></div>
+        </div>
+
         <!-- Dynamic filter sections injected here by buildSidebar() -->
 
         <!-- Assignees (always shown) -->
@@ -653,8 +680,10 @@ const S = {
   filteredIssues: [],  // issues of filteredEpics matching current issue-label + search filters
   milestones: [],
   // Filters
-  activeEpicLabels: new Set(),   // labels clicked on overview/epic context
-  activeIssueLabels: new Set(),  // labels clicked on issues context
+  activeEpicLabels: new Set(),    // epic labels to INCLUDE (epic must have all)
+  excludeEpicLabels: new Set(),   // epic labels to EXCLUDE (epic must have none)
+  activeIssueLabels: new Set(),   // issue labels to INCLUDE
+  excludeIssueLabels: new Set(),  // issue labels to EXCLUDE
   activeAssignees: new Set(),
   activeTab: 'overview',
   hiddenScopes: new Set(),
@@ -967,6 +996,7 @@ function buildApp() {
   rb.style.color = ROLE_COLORS[S.role];
   buildSidebar();
   buildTabs();
+  renderSavedFilters();
   renderAll();
 }
 
@@ -1145,7 +1175,7 @@ function toggleScopeVisibility(scopeKey, btn) {
 function filterChipHTML(lbl, displayName, cnt, color) {
   const dot = `<span class="chip-dot" style="background:${color||'#6B7280'}"></span>`;
   return `<div class="filter-chip" data-label="${lbl.replace(/"/g,'&quot;')}" onclick="toggleLabel(this)">
-    ${dot}<span class="chip-label">${esc(displayName)}</span><span class="chip-count">${cnt}</span>
+    ${dot}<span class="chip-mode"></span><span class="chip-label">${esc(displayName)}</span><span class="chip-count">${cnt}</span>
   </div>`;
 }
 
@@ -1155,9 +1185,29 @@ function filterChipHTML(lbl, displayName, cnt, color) {
 function toggleLabel(el) {
   const lbl = el.dataset.label;
   const isEpicCtx = ['overview','milestones','risks','labels','assignees'].includes(S.activeTab);
-  const set = isEpicCtx ? S.activeEpicLabels : S.activeIssueLabels;
-  set.has(lbl) ? set.delete(lbl) : set.add(lbl);
-  el.classList.toggle('active');
+  const incSet = isEpicCtx ? S.activeEpicLabels  : S.activeIssueLabels;
+  const excSet = isEpicCtx ? S.excludeEpicLabels : S.excludeIssueLabels;
+  const modeEl = el.querySelector('.chip-mode');
+
+  if (!incSet.has(lbl) && !excSet.has(lbl)) {
+    // off → include
+    incSet.add(lbl);
+    el.classList.add('active');
+    el.classList.remove('exclude');
+    if (modeEl) modeEl.textContent = '+';
+  } else if (incSet.has(lbl)) {
+    // include → exclude
+    incSet.delete(lbl);
+    excSet.add(lbl);
+    el.classList.remove('active');
+    el.classList.add('exclude');
+    if (modeEl) modeEl.textContent = '−';
+  } else {
+    // exclude → off
+    excSet.delete(lbl);
+    el.classList.remove('active','exclude');
+    if (modeEl) modeEl.textContent = '';
+  }
   updateClearBtn();
   applyFilters();
 }
@@ -1171,14 +1221,21 @@ function toggleAssignee(el) {
 function clearFilters() {
   S.activeEpicLabels.clear();
   S.activeIssueLabels.clear();
+  S.excludeEpicLabels.clear();
+  S.excludeIssueLabels.clear();
   S.activeAssignees.clear();
   document.getElementById('search-box').value = '';
-  document.querySelectorAll('.filter-chip.active').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.filter-chip.active, .filter-chip.exclude').forEach(c => {
+    c.classList.remove('active','exclude');
+    const m = c.querySelector('.chip-mode');
+    if (m) m.textContent = '';
+  });
   updateClearBtn();
   applyFilters();
 }
 function updateClearBtn() {
   const has = S.activeEpicLabels.size > 0 || S.activeIssueLabels.size > 0 ||
+              S.excludeEpicLabels.size > 0 || S.excludeIssueLabels.size > 0 ||
               S.activeAssignees.size > 0 || document.getElementById('search-box').value;
   document.getElementById('clear-btn').style.display = has ? '' : 'none';
 }
@@ -1186,23 +1243,28 @@ function updateClearBtn() {
 function applyFilters() {
   updateClearBtn();
   const term        = document.getElementById('search-box').value.toLowerCase();
-  const epicLabels  = [...S.activeEpicLabels];
-  const issueLabels = [...S.activeIssueLabels];
+  const incEpic     = [...S.activeEpicLabels];
+  const excEpic     = [...S.excludeEpicLabels];
+  const incIssue    = [...S.activeIssueLabels];
+  const excIssue    = [...S.excludeIssueLabels];
 
-  // 1. Filter epics by their own labels (epic-context filters)
+  // 1. Filter epics: must have ALL include labels, must have NONE of exclude labels
   S.filteredEpics = S.allEpics.filter(({epic}) => {
-    if (!epicLabels.length) return true;
-    return epicLabels.every(l => (epic._labels||[]).includes(l));
+    const epLabels = epic._labels || [];
+    if (incEpic.length && !incEpic.every(l => epLabels.includes(l))) return false;
+    if (excEpic.length &&  excEpic.some(l  => epLabels.includes(l))) return false;
+    return true;
   });
 
   // 2. Issue pool = issues belonging to filtered epics
   const filteredEpicIssueIds = new Set(S.filteredEpics.flatMap(({issues}) => issues.map(i => i.id)));
 
-  // 3. Filter those issues by issue labels + assignees + search
+  // 3. Filter issues: must pass epic pool + include + exclude + assignees + search
   S.filteredIssues = S.allIssues.filter(i => {
     if (!filteredEpicIssueIds.has(i.id)) return false;
     if (term && !i.title.toLowerCase().includes(term) && !String(i.iid).includes(term)) return false;
-    if (issueLabels.length && !issueLabels.every(l => i.labels.includes(l))) return false;
+    if (incIssue.length && !incIssue.every(l => i.labels.includes(l))) return false;
+    if (excIssue.length &&  excIssue.some(l  => i.labels.includes(l))) return false;
     if (S.activeAssignees.size > 0) {
       const ids = new Set((i.assignees||[]).map(a => a.id));
       if (![...S.activeAssignees].some(id => ids.has(id))) return false;
@@ -1210,14 +1272,108 @@ function applyFilters() {
     return true;
   });
 
-  // 4. Re-derive milestones from the now-filtered issues
+  // 4. Re-derive milestones from filtered issues
   S.milestones = deriveMilestonesFromIssues(S.filteredIssues);
 
   renderAll();
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// TABS
+// ── Saved Filters ──
+function getSavedFilters() {
+  try { return JSON.parse(localStorage.getItem('epicdash_saved_filters') || '[]'); }
+  catch(e) { return []; }
+}
+function putSavedFilters(arr) {
+  try { localStorage.setItem('epicdash_saved_filters', JSON.stringify(arr)); } catch(e) {}
+}
+
+function saveCurrentFilters() {
+  const hasAny = S.activeEpicLabels.size || S.excludeEpicLabels.size ||
+                 S.activeIssueLabels.size || S.excludeIssueLabels.size || S.activeAssignees.size;
+  if (!hasAny) { alert('No active filters to save.'); return; }
+
+  const saved = getSavedFilters();
+  const defaultName = 'Filter ' + (saved.length + 1);
+  const name = prompt('Name this filter config:', defaultName);
+  if (!name) return;
+
+  saved.push({
+    name: name.trim() || defaultName,
+    incEpic:  [...S.activeEpicLabels],
+    excEpic:  [...S.excludeEpicLabels],
+    incIssue: [...S.activeIssueLabels],
+    excIssue: [...S.excludeIssueLabels],
+    assignees: [...S.activeAssignees],
+  });
+  putSavedFilters(saved);
+  renderSavedFilters();
+}
+
+function applySavedFilter(idx) {
+  const saved = getSavedFilters();
+  const f = saved[idx];
+  if (!f) return;
+
+  // Clear first
+  clearFilters();
+
+  // Re-apply saved state
+  (f.incEpic  ||[]).forEach(l => S.activeEpicLabels.add(l));
+  (f.excEpic  ||[]).forEach(l => S.excludeEpicLabels.add(l));
+  (f.incIssue ||[]).forEach(l => S.activeIssueLabels.add(l));
+  (f.excIssue ||[]).forEach(l => S.excludeIssueLabels.add(l));
+  (f.assignees||[]).forEach(id => S.activeAssignees.add(id));
+
+  // Reflect state back onto chips
+  document.querySelectorAll('.filter-chip[data-label]').forEach(el => {
+    const lbl = el.dataset.label;
+    const modeEl = el.querySelector('.chip-mode');
+    const isEpicCtx = ['overview','milestones','risks','labels','assignees'].includes(S.activeTab);
+    if (isEpicCtx) {
+      if (S.activeEpicLabels.has(lbl))  { el.classList.add('active');   el.classList.remove('exclude'); if(modeEl) modeEl.textContent='+'; }
+      if (S.excludeEpicLabels.has(lbl)) { el.classList.add('exclude');  el.classList.remove('active');  if(modeEl) modeEl.textContent='−'; }
+    } else {
+      if (S.activeIssueLabels.has(lbl))  { el.classList.add('active');  el.classList.remove('exclude'); if(modeEl) modeEl.textContent='+'; }
+      if (S.excludeIssueLabels.has(lbl)) { el.classList.add('exclude'); el.classList.remove('active');  if(modeEl) modeEl.textContent='−'; }
+    }
+  });
+  document.querySelectorAll('.filter-chip[data-assignee]').forEach(el => {
+    if (S.activeAssignees.has(parseInt(el.dataset.assignee))) el.classList.add('active');
+  });
+
+  updateClearBtn();
+  applyFilters();
+}
+
+function deleteSavedFilter(idx) {
+  const saved = getSavedFilters();
+  saved.splice(idx, 1);
+  putSavedFilters(saved);
+  renderSavedFilters();
+}
+
+function renderSavedFilters() {
+  const saved = getSavedFilters();
+  const list = document.getElementById('saved-filters-list');
+  if (!list) return;
+  if (!saved.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:2px 4px 6px">No saved filters yet</div>';
+    return;
+  }
+  list.innerHTML = saved.map((f, i) => {
+    const parts = [];
+    if (f.incEpic?.length)  parts.push('+' + f.incEpic.map(l=>l.split('::').pop()).join(', '));
+    if (f.excEpic?.length)  parts.push('−' + f.excEpic.map(l=>l.split('::').pop()).join(', '));
+    if (f.incIssue?.length) parts.push('+' + f.incIssue.map(l=>l.split('::').pop()).join(', '));
+    if (f.excIssue?.length) parts.push('−' + f.excIssue.map(l=>l.split('::').pop()).join(', '));
+    const preview = parts.join(' · ') || 'empty';
+    return `<div class="saved-filter-row" title="${esc(preview)}">
+      <span class="saved-filter-name">${esc(f.name)}</span>
+      <button class="saved-filter-btn saved-filter-apply" onclick="applySavedFilter(${i})">Apply</button>
+      <button class="saved-filter-btn saved-filter-del"   onclick="deleteSavedFilter(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
 // ═══════════════════════════════════════════════════════════════════════
 const TAB_DEFS = {
   PO:  ['overview','issues','milestones','labels','risks'],
