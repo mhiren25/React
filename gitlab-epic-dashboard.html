@@ -112,6 +112,21 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 .saved-badge { font-size: 11px; color: var(--green); background: rgba(34,197,94,0.1); padding: 3px 8px; border-radius: 20px; margin-left: 8px; display: none; }
 .forget-link { font-size: 11px; color: var(--muted); text-decoration: underline; cursor: pointer; display: none; margin-top: 8px; }
 .forget-link:hover { color: var(--red); }
+.ql-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(252,109,38,0.15); border: 1px solid rgba(252,109,38,0.35);
+  color: var(--accent); border-radius: 6px; padding: 2px 8px;
+  font-size: 12px; font-family: var(--mono); white-space: nowrap;
+}
+.ql-tag-remove { cursor: pointer; opacity: 0.6; font-size: 13px; line-height: 1; }
+.ql-tag-remove:hover { opacity: 1; color: var(--red); }
+.ql-mode-btn {
+  background: var(--surface2); border: 1px solid var(--border2); color: var(--muted);
+  border-radius: 6px; padding: 3px 10px; font-size: 11px; cursor: pointer;
+  font-family: var(--sans); transition: all 0.15s;
+}
+.ql-mode-btn:hover { border-color: var(--accent); color: var(--text); }
+.ql-mode-active { background: rgba(252,109,38,0.12); border-color: rgba(252,109,38,0.4); color: var(--accent); }
 
 /* ── LOADING ── */
 #loading-screen {
@@ -551,8 +566,16 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
       <input class="field-input" id="s-pat" type="password" placeholder="glpat-…" autocomplete="off"/>
     </div>
     <div class="field-group">
-      <label class="field-label">Quarter Label <span style="color:var(--muted);font-size:10px;font-weight:400;text-transform:none;letter-spacing:0">(e.g. Committed::26Q2 or Increment::26Q2)</span></label>
-      <input class="field-input" id="s-quarter" type="text" placeholder="Committed::26Q2" autocomplete="off"/>
+      <label class="field-label">Quarter Labels <span style="color:var(--muted);font-size:10px;font-weight:400;text-transform:none;letter-spacing:0">(press Enter or comma to add — e.g. Committed::26Q2)</span></label>
+      <div id="ql-tags" style="display:flex;flex-wrap:wrap;gap:6px;background:var(--bg);border:1px solid var(--border2);border-radius:10px;padding:8px 12px;min-height:44px;cursor:text;transition:border-color 0.2s" onclick="document.getElementById('ql-input').focus()"></div>
+      <input id="ql-input" type="text" placeholder="Type a label and press Enter…" autocomplete="off"
+        style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-family:var(--sans);font-size:13px;margin-top:6px;padding:0 4px"
+        onkeydown="qlKeydown(event)" oninput="qlInputHint()"/>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+        <span style="font-size:11px;color:var(--muted)">Match mode:</span>
+        <button id="ql-and" class="ql-mode-btn ql-mode-active" onclick="setQlMode('AND')">AND — all labels</button>
+        <button id="ql-or"  class="ql-mode-btn" onclick="setQlMode('OR')">OR — any label</button>
+      </div>
     </div>
 
     <div class="field-group">
@@ -649,14 +672,15 @@ body { background: var(--bg); color: var(--text); font-family: var(--sans); font
 // STATE
 // ═══════════════════════════════════════════════════════════════════════
 const S = {
-  host: '', groupPath: '', pat: '', quarterLabel: '', role: '',
+  host: '', groupPath: '', pat: '', role: '',
+  quarterLabels: [],   // array of label strings — epics must match these
+  quarterMode: 'AND',  // 'AND' = epic must have ALL labels, 'OR' = epic must have ANY
   epics: [], allIssues: [], filteredIssues: [],
   milestones: [], rankMap: new Map(),
   activeLabels: new Set(), activeAssignees: new Set(),
   activeTab: 'overview',
-  // Derived from actual issue/epic labels — no group API needed
-  hiddenScopes: new Set(),        // scopes the user has toggled off in sidebar
-  labelColorCache: new Map(),     // label name → color (auto-generated, consistent)
+  hiddenScopes: new Set(),
+  labelColorCache: new Map(),
 };
 
 const ROLE_COLORS = { PO:'#FC6D26', SM:'#14B8A6', DEV:'#3B82F6', QA:'#A855F7' };
@@ -676,13 +700,14 @@ function selectRole(btn) {
 function loadSaved() {
   try {
     const cfg = JSON.parse(localStorage.getItem('epicdash_cfg') || '{}');
-    if (cfg.url)     document.getElementById('s-url').value = cfg.url;
-    if (cfg.pat)     document.getElementById('s-pat').value = cfg.pat;
-    if (cfg.quarter) document.getElementById('s-quarter').value = cfg.quarter;
+    if (cfg.url) document.getElementById('s-url').value = cfg.url;
+    if (cfg.pat) document.getElementById('s-pat').value = cfg.pat;
     if (cfg.role) {
       const btn = document.querySelector(`.role-btn[data-role="${cfg.role}"]`);
       if (btn) selectRole(btn);
     }
+    if (Array.isArray(cfg.quarterLabels)) cfg.quarterLabels.forEach(l => qlAddTag(l));
+    if (cfg.quarterMode) setQlMode(cfg.quarterMode);
     if (Array.isArray(cfg.hiddenScopes)) S.hiddenScopes = new Set(cfg.hiddenScopes);
     if (cfg.url || cfg.pat) {
       document.getElementById('saved-badge').style.display = 'inline';
@@ -695,7 +720,8 @@ function saveConfig() {
   localStorage.setItem('epicdash_cfg', JSON.stringify({
     url: S.host + '/' + S.groupPath,
     pat: S.pat,
-    quarter: S.quarterLabel,
+    quarterLabels: S.quarterLabels,
+    quarterMode: S.quarterMode,
     role: S.role,
     hiddenScopes: [...S.hiddenScopes],
   }));
@@ -703,7 +729,9 @@ function saveConfig() {
 
 function forgetConfig() {
   localStorage.removeItem('epicdash_cfg');
-  ['s-url','s-pat','s-quarter'].forEach(id => document.getElementById(id).value = '');
+  ['s-url','s-pat'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ql-tags').innerHTML = '';
+  document.getElementById('ql-input').value = '';
   document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
   selectedRole = '';
   document.getElementById('saved-badge').style.display = 'none';
@@ -714,6 +742,47 @@ function changeConfig() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('setup-screen').style.display = 'flex';
   loadSaved();
+}
+
+// ── Quarter Label Tag Input ──
+function qlAddTag(label) {
+  label = label.trim();
+  if (!label) return;
+  // Prevent duplicates
+  const existing = [...document.querySelectorAll('#ql-tags .ql-tag')].map(t => t.dataset.label);
+  if (existing.includes(label)) return;
+  const tag = document.createElement('span');
+  tag.className = 'ql-tag';
+  tag.dataset.label = label;
+  tag.innerHTML = '<span>' + esc(label) + '</span><span class="ql-tag-remove" onclick="this.parentElement.remove()">×</span>';
+  document.getElementById('ql-tags').appendChild(tag);
+}
+
+function qlKeydown(e) {
+  const input = document.getElementById('ql-input');
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = input.value.replace(/,/g, '').trim();
+    if (val) { qlAddTag(val); input.value = ''; }
+  } else if (e.key === 'Backspace' && input.value === '') {
+    // Remove last tag on backspace when input is empty
+    const tags = document.querySelectorAll('#ql-tags .ql-tag');
+    if (tags.length) tags[tags.length - 1].remove();
+  }
+}
+
+function qlInputHint() {
+  // If user typed a comma, treat it as separator
+  const input = document.getElementById('ql-input');
+  if (input.value.includes(',')) {
+    input.value.split(',').forEach(p => { const t = p.trim(); if (t) qlAddTag(t); });
+    input.value = '';
+  }
+}
+
+function setQlMode(mode) {
+  document.getElementById('ql-and').classList.toggle('ql-mode-active', mode === 'AND');
+  document.getElementById('ql-or').classList.toggle('ql-mode-active', mode === 'OR');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -739,14 +808,16 @@ function setStatus(msg) { document.getElementById('load-status').textContent = m
 // LOAD
 // ═══════════════════════════════════════════════════════════════════════
 async function startLoad() {
-  const urlRaw   = document.getElementById('s-url').value.trim();
-  const pat      = document.getElementById('s-pat').value.trim();
-  const quarter  = document.getElementById('s-quarter').value.trim();
+  const urlRaw = document.getElementById('s-url').value.trim();
+  const pat    = document.getElementById('s-pat').value.trim();
 
   if (!urlRaw || !pat || !selectedRole) {
     showErr('Please fill GitLab URL, token, and select a role.');
     return;
   }
+
+  // Collect quarter labels from tag UI
+  const quarterLabels = [...document.querySelectorAll('#ql-tags .ql-tag')].map(t => t.dataset.label).filter(Boolean);
 
   let host, groupPath;
   try {
@@ -758,7 +829,9 @@ async function startLoad() {
   }
 
   S.host = host; S.groupPath = groupPath; S.pat = pat;
-  S.quarterLabel = quarter; S.role = selectedRole;
+  S.quarterLabels = quarterLabels;
+  S.quarterMode = document.getElementById('ql-and').classList.contains('ql-mode-active') ? 'AND' : 'OR';
+  S.role = selectedRole;
 
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('loading-screen').style.display = 'flex';
@@ -776,29 +849,54 @@ async function startLoad() {
   }
 }
 
+// Helper: extract labels array from an epic object
+function getEpicLabels(ep) {
+  return Array.isArray(ep.labels)
+    ? ep.labels.map(l => typeof l === 'string' ? l : (l.name || '')).filter(Boolean)
+    : [];
+}
+
+// Does an epic match the configured quarter labels?
+function epicMatchesQuarter(ep) {
+  if (!S.quarterLabels.length) return true; // no filter → include all
+  const epLabels = getEpicLabels(ep);
+  if (S.quarterMode === 'OR') {
+    return S.quarterLabels.some(ql => epLabels.includes(ql));
+  } else { // AND
+    return S.quarterLabels.every(ql => epLabels.includes(ql));
+  }
+}
+
 async function fetchAll() {
   const base = `${S.host}/api/v4`;
   const enc  = encodeURIComponent(S.groupPath);
 
   setStatus('Loading epics…');
-  const epicsRaw = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
+  const allEpics = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
+
+  // Filter epics at the EPIC level by quarter label(s)
+  const epicsForQuarter = allEpics.filter(epicMatchesQuarter);
+
+  // Console debug
+  console.group('EpicDash — Epic filter');
+  console.log('Total open epics:', allEpics.length);
+  console.log('Quarter labels:', S.quarterLabels, '| Mode:', S.quarterMode);
+  console.log('Matched epics:', epicsForQuarter.length);
+  if (S.quarterLabels.length && epicsForQuarter.length === 0) {
+    const allEpicLabels = [...new Set(allEpics.flatMap(ep => getEpicLabels(ep)))];
+    console.warn('No epics matched. All labels seen on epics:', allEpicLabels.join(', '));
+  }
+  console.groupEnd();
 
   setStatus('Loading milestones…');
-  // Fetch active milestones + recently-due ones in one call by fetching all and filtering client-side
-  // Rule: keep if NOT closed, OR if due_date >= 3 months ago (so recently closed still show)
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-  const allMilestones = await glFetch(`${base}/groups/${enc}/milestones?per_page=100`);
-  S.milestones = allMilestones.filter(m => {
-    // Always keep non-closed milestones
-    if (m.state !== 'closed') return true;
-    // For closed milestones: only keep if due_date is within last 3 months
-    if (m.due_date && new Date(m.due_date) >= threeMonthsAgo) return true;
-    return false;
-  });
+  // Active milestones only — closed milestones are history
+  S.milestones = await glFetch(`${base}/groups/${enc}/milestones?state=active&per_page=100`);
 
-  setStatus(`Loading issues for ${epicsRaw.length} epics…`);
-  const epicData = await Promise.all(epicsRaw.map(async ep => {
+  setStatus(`Loading issues for ${epicsForQuarter.length} epic(s)…`);
+  const epicData = await Promise.all(epicsForQuarter.map(async ep => {
+    const epicLabels = getEpicLabels(ep);
+    ep._labels = epicLabels; // store for sidebar + rendering
+
     const issues = await glFetch(`${base}/groups/${enc}/epics/${ep.iid}/issues?per_page=100`);
     const enriched = await Promise.all(issues.map(async i => {
       let mrCount = i.merge_requests_count || 0;
@@ -808,7 +906,8 @@ async function fetchAll() {
           mrCount = Array.isArray(mrs) ? mrs.length : 0;
         } catch(e) { mrCount = 0; }
       }
-      return enrichIssue({ ...i, _mrCount: mrCount });
+      // Pass epicLabels — Estimate/Rank labels live on the epic
+      return enrichIssue({ ...i, _mrCount: mrCount, _epicLabels: epicLabels });
     }));
     return { epic: ep, issues: enriched };
   }));
@@ -817,40 +916,12 @@ async function fetchAll() {
   S.allIssues = epicData.flatMap(e => e.issues);
   S.filteredIssues = [...S.allIssues];
 
-  // ── Build label color cache from ALL labels: issues + epics ──
+  // Build label color cache from all labels (issues + epics)
   S.labelColorCache = new Map();
   const allLabelNames = new Set();
   S.allIssues.forEach(i => i.labels.forEach(l => allLabelNames.add(l)));
-  epicsRaw.forEach(ep => {
-    const epLabels = Array.isArray(ep.labels) ? ep.labels.map(l => typeof l==='string'?l:l.name).filter(Boolean) : [];
-    epLabels.forEach(l => allLabelNames.add(l));
-  });
+  epicsForQuarter.forEach(ep => (ep._labels||[]).forEach(l => allLabelNames.add(l)));
   allLabelNames.forEach(name => S.labelColorCache.set(name, autoColor(name)));
-
-  // ── Store epic labels on each epic entry for sidebar use ──
-  S.epics.forEach(entry => {
-    entry.epic._labelsNorm = Array.isArray(entry.epic.labels)
-      ? entry.epic.labels.map(l => typeof l==='string'?l:l.name).filter(Boolean)
-      : [];
-  });
-
-  // Debug: log label summary to console so user can verify quarter label spelling
-  const issueLabelScopes = new Map();
-  S.allIssues.forEach(i => i.labels.forEach(l => {
-    const idx = l.indexOf('::');
-    const scope = idx > 0 ? l.slice(0, idx) : '(plain)';
-    if (!issueLabelScopes.has(scope)) issueLabelScopes.set(scope, new Set());
-    issueLabelScopes.get(scope).add(l);
-  }));
-  console.group('EpicDash — Labels found on issues');
-  issueLabelScopes.forEach((lbls, scope) => {
-    console.log(scope + ':', [...lbls].join(', '));
-  });
-  if (S.quarterLabel) {
-    const matched = S.allIssues.filter(i => i.isCommitted).length;
-    console.log(`Quarter label "${S.quarterLabel}" → matched ${matched} issues`);
-  }
-  console.groupEnd();
 }
 
 async function refreshData() {
@@ -899,12 +970,13 @@ function normLabel(s) {
 // ENRICH ISSUE
 // ═══════════════════════════════════════════════════════════════════════
 function enrichIssue(i) {
-  // GitLab epic-issues API returns labels as array of strings
   const labels = Array.isArray(i.labels)
     ? i.labels.map(l => typeof l === 'string' ? l : (l.name || '')).filter(Boolean)
     : [];
 
-  // Build scopedMap from actual label strings (case-sensitive keys preserved)
+  // Epic labels passed in from fetchAll — Estimate/Rank labels live here
+  const epicLabels = Array.isArray(i._epicLabels) ? i._epicLabels : [];
+
   const scopedMap = {};
   const plainLabels = [];
   labels.forEach(l => {
@@ -919,35 +991,34 @@ function enrichIssue(i) {
     }
   });
 
-  // ── ESTIMATE: time_stats first, then Estimate:: label ──
-  // Scope must match exactly as stored by GitLab (case-sensitive).
-  // We check common casings as fallback since some teams title-case, others don't.
+  // ── ESTIMATE: time_stats → epic labels → issue labels ──
+  // Check epic labels first (Estimate:: lives on the epic in most setups)
+  const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size', 'Complexity'];
+  function parseEstimate(labelList) {
+    for (const lbl of labelList) {
+      const idx = lbl.indexOf('::');
+      if (idx > 0 && ESTIMATE_SCOPES.includes(lbl.slice(0, idx).trim())) {
+        const raw = lbl.slice(idx + 2).trim();
+        const m = raw.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
+        if (m) {
+          const n = parseFloat(m[1]);
+          const u = (m[2] || 'pd').toLowerCase();
+          return u.startsWith('w') ? Math.round(n * 5) : Math.round(n);
+        }
+      }
+    }
+    return 0;
+  }
+
   let estimatePd = 0;
   if (i.time_stats?.time_estimate) {
     estimatePd = Math.round(i.time_stats.time_estimate / 28800);
   } else {
-    const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size'];
-    let rawEst = null;
-    for (const lbl of labels) {
-      const idx = lbl.indexOf('::');
-      if (idx > 0 && ESTIMATE_SCOPES.includes(lbl.slice(0, idx).trim())) {
-        rawEst = lbl.slice(idx + 2).trim();
-        break;
-      }
-    }
-    if (rawEst) {
-      // Match: "3", "3pd", "3 pd", "3d", "1pw", "1w", "2weeks", "5sp", "0.5w"
-      const m = rawEst.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
-      if (m) {
-        const n = parseFloat(m[1]);
-        const u = (m[2] || 'pd').toLowerCase();
-        estimatePd = u.startsWith('w') ? Math.round(n * 5) : Math.round(n);
-      }
-    }
+    estimatePd = parseEstimate(epicLabels) || parseEstimate(labels);
   }
 
-  // ── STATUS: exact scope match with common casings ──
-  const STATUS_SCOPES = ['Status', 'status', 'STATUS', 'Workflow', 'workflow'];
+  // ── STATUS: check issue labels (status lives on issues) ──
+  const STATUS_SCOPES = ['Status', 'status', 'Workflow', 'workflow'];
   let statusVal = '';
   for (const lbl of labels) {
     const idx = lbl.indexOf('::');
@@ -961,25 +1032,23 @@ function enrichIssue(i) {
   const inProgress = statusVal.includes('progress') || statusVal.includes('doing') || statusVal.includes('wip');
   const isDone     = statusVal.includes('done') || statusVal.includes('complete') || i.state === 'closed';
 
-  // ── QUARTER / COMMITTED: normalize both sides before comparing ──
-  const qNorm = S.quarterLabel ? normLabel(S.quarterLabel) : '';
-  const isCommitted = qNorm
-    ? labels.some(l => normLabel(l) === qNorm)
-    : false;
-
   const mrCount = i._mrCount || i.merge_requests_count || 0;
 
-  return { ...i, labels, scopedMap, plainLabels, estimatePd, isBlocked, inReview, inProgress, isDone, isCommitted, mrCount };
+  return { ...i, labels, epicLabels, scopedMap, plainLabels, estimatePd, isBlocked, inReview, inProgress, isDone, mrCount };
 }
 
 // ═══════════════════════════════════════════════════════════════════════
 // BUILD APP
 // ═══════════════════════════════════════════════════════════════════════
 function buildApp() {
-  // Topbar
   document.getElementById('tb-group').textContent = S.groupPath;
   const qp = document.getElementById('tb-quarter');
-  if (S.quarterLabel) { qp.textContent = S.quarterLabel; qp.style.display = 'inline'; }
+  if (S.quarterLabels.length) {
+    qp.textContent = S.quarterLabels.join(S.quarterMode === 'AND' ? ' & ' : ' | ');
+    qp.style.display = 'inline';
+  } else {
+    qp.style.display = 'none';
+  }
   const rb = document.getElementById('tb-role');
   rb.textContent = ROLE_LABELS[S.role];
   rb.style.background = ROLE_COLORS[S.role] + '22';
@@ -997,20 +1066,21 @@ function buildApp() {
 // Scopes hidden from filter sidebar by default (too noisy / not useful for filtering)
 const DEFAULT_HIDDEN_SCOPES = new Set(['rank','team','squad','weight','sprint','pi']);
 
-// The quarter-label scope (derived at runtime from S.quarterLabel)
+// The quarter-label scope (derived at runtime from S.quarterLabels)
 function quarterScope() {
-  if (!S.quarterLabel) return null;
-  const idx = S.quarterLabel.indexOf('::');
-  return idx > 0 ? S.quarterLabel.slice(0, idx).trim().toLowerCase() : null;
+  if (!S.quarterLabels.length) return null;
+  const first = S.quarterLabels[0];
+  const idx = first.indexOf('::');
+  return idx > 0 ? first.slice(0, idx).trim().toLowerCase() : null;
 }
 
 function buildSidebar() {
   // ── 1. Collect label usage from issues AND epics ──
-  const usage = new Map(); // full label string → count
+  const usage = new Map();
   S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
-  // Epic labels: count each epic label once (epics are the parent containers)
+  // Epic labels counted once per epic
   S.epics.forEach(({epic}) => {
-    (epic._labelsNorm || []).forEach(l => usage.set(l, (usage.get(l)||0)+1));
+    (epic._labels||[]).forEach(l => usage.set(l, (usage.get(l)||0)+1));
   });
 
   // ── 2. Bucket by scope (case-insensitive) ──
@@ -1285,7 +1355,7 @@ function updateTabBadges() {
   const fi = S.filteredIssues;
   const setBadge = (id, val) => { const el = document.getElementById(`tab-badge-${id}`); if(el) el.textContent = val||''; };
   setBadge('issues', fi.length);
-  setBadge('overview', fi.filter(i=>i.isCommitted).length || fi.length);
+  setBadge('overview', fi.length);
   setBadge('risks', fi.filter(i=>i.isBlocked).length || '');
   setBadge('milestones', S.milestones.length || '');
   const assigneeCount = new Set(fi.flatMap(i=>(i.assignees||[]).map(a=>a.id))).size;
@@ -1297,83 +1367,34 @@ function updateTabBadges() {
 // ═══════════════════════════════════════════════════════════════════════
 function renderOverview() {
   const fi = S.filteredIssues;
-  const committed = S.quarterLabel ? fi.filter(i=>i.isCommitted) : fi;
-  const total   = committed.length;
-  const closed  = committed.filter(i=>i.state==='closed').length;
+  // All issues are already from quarter-filtered epics — no secondary isCommitted check needed
+  const total   = fi.length;
+  const closed  = fi.filter(i=>i.state==='closed').length;
   const open    = total - closed;
-  const blocked = committed.filter(i=>i.isBlocked).length;
-  const noEst   = committed.filter(i=>!i.estimatePd).length;
-  const noAss   = committed.filter(i=>!(i.assignees||[]).length).length;
-  const totalPd = committed.reduce((s,i)=>s+(i.estimatePd||0),0);
-  const donePd  = committed.filter(i=>i.state==='closed').reduce((s,i)=>s+(i.estimatePd||0),0);
+  const blocked = fi.filter(i=>i.isBlocked).length;
+  const noEst   = fi.filter(i=>!i.estimatePd).length;
+  const noAss   = fi.filter(i=>!(i.assignees||[]).length).length;
+  const totalPd = fi.reduce((s,i)=>s+(i.estimatePd||0),0);
+  const donePd  = fi.filter(i=>i.state==='closed').reduce((s,i)=>s+(i.estimatePd||0),0);
   const pct     = total ? Math.round(closed/total*100) : 0;
   const color   = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';
+  const qLabel  = S.quarterLabels.length ? S.quarterLabels.join(S.quarterMode==='AND'?' & ':' | ') : 'All Epics';
 
-  // ── Quarter label diagnostic banner ──
-  let diagHTML = '';
-  if (S.quarterLabel) {
-    const qNorm = normLabel(S.quarterLabel);
-    const allLabelsOnIssues = new Map();
-    fi.forEach(i => i.labels.forEach(l => allLabelsOnIssues.set(l, (allLabelsOnIssues.get(l)||0)+1)));
-    // Find labels that look like they could be the quarter label (same scope)
-    const qScopeRaw = S.quarterLabel.split('::')[0].trim().toLowerCase();
-    const candidates = [...allLabelsOnIssues.entries()]
-      .filter(([l]) => l.toLowerCase().includes(qScopeRaw) || normLabel(l).startsWith(qScopeRaw))
-      .sort((a,b) => b[1]-a[1])
-      .slice(0, 8);
-
-    if (total === 0 && S.quarterLabel) {
-      const candChips = candidates.map(([l,c]) =>
-        '<span class="ql-candidate" data-lbl="' + l.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" style="cursor:pointer;background:var(--surface2);border:1px solid var(--border2);border-radius:6px;padding:2px 8px;font-family:var(--mono);font-size:11px" title="Click to copy to Settings">' +
-        esc(l) + ' <span style="color:var(--muted)">(' + c + ')</span></span>'
-      ).join('');
-      diagHTML =
-        '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:12px">' +
-        '<div style="font-weight:600;color:var(--red);margin-bottom:6px">⚠ No issues matched quarter label "' + esc(S.quarterLabel) + '"</div>' +
-        '<div style="color:var(--muted);margin-bottom:8px">Normalised to: <code style="background:var(--surface2);padding:1px 6px;border-radius:4px">' + esc(qNorm) + '</code></div>' +
-        (candidates.length
-          ? '<div style="color:var(--muted);margin-bottom:6px">Labels found on issues with scope "<b>' + esc(qScopeRaw) + '</b>":</div>' +
-            '<div style="display:flex;flex-wrap:wrap;gap:6px">' + candChips + '</div>' +
-            '<div style="color:var(--muted);margin-top:8px;font-size:11px">💡 Click a label above to copy it, then open ⚙ Settings and paste it as your Quarter Label.</div>'
-          : '<div style="color:var(--muted)">No labels with scope "' + esc(qScopeRaw) + '" found on any issue. Check the Label Analysis tab to see all labels present.</div>'
-        ) +
-        '</div>';
-      // Wire up click handlers after DOM insertion (called in renderOverview after innerHTML set)
-      setTimeout(() => {
-        document.querySelectorAll('.ql-candidate').forEach(el => {
-          el.addEventListener('click', () => {
-            const lbl = el.dataset.lbl;
-            S.quarterLabel = lbl;
-            document.getElementById('tb-quarter').textContent = lbl;
-            document.getElementById('tb-quarter').style.display = 'inline';
-            // Re-enrich all issues with new quarter label
-            S.allIssues = S.allIssues.map(i => Object.assign(i, { isCommitted: normLabel(i.labels.find(x=>normLabel(x)===normLabel(lbl))||'') === normLabel(lbl) }));
-            S.allIssues.forEach(i => { i.isCommitted = i.labels.some(x => normLabel(x) === normLabel(lbl)); });
-            applyFilters();
-            // Persist
-            try { const cfg = JSON.parse(localStorage.getItem('epicdash_cfg')||'{}'); cfg.quarter=lbl; localStorage.setItem('epicdash_cfg',JSON.stringify(cfg)); } catch(e){}
-          });
-        });
-      }, 0);
-    }
-  }
-
-  let kpisHTML = diagHTML + `
+  let kpisHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
-      ${kpiCard('Committed', total, '', 'var(--accent)', S.quarterLabel || 'all issues')}
+      ${kpiCard('Issues', total, '', 'var(--accent)', qLabel)}
       ${kpiCard('Closed', closed, '', 'var(--green)', pct+'% complete')}
-      ${kpiCard('Open', open, '', open>0?'var(--blue)':'var(--green)', committed.filter(i=>i.inProgress).length+' in progress')}
+      ${kpiCard('Open', open, '', open>0?'var(--blue)':'var(--green)', fi.filter(i=>i.inProgress).length+' in progress')}
       ${kpiCard('Blocked', blocked, '⚠', blocked>0?'var(--red)':'var(--muted)', blocked>0?'needs attention':'all clear')}
       ${kpiCard('Est. Total', totalPd?totalPd+'pd':'—', '', 'var(--blue)', donePd?donePd+'pd done':'none closed yet')}
       ${kpiCard('No Estimate', noEst, '!', noEst>0?'var(--yellow)':'var(--muted)', 'missing estimate')}
       ${kpiCard('Unassigned', noAss, '', noAss>0?'var(--yellow)':'var(--muted)', 'no assignee')}
     </div>`;
 
-  // Quarter progress bar
   kpisHTML += `
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:24px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:600">${S.quarterLabel || 'Quarter'} Progress</div>
+        <div style="font-size:13px;font-weight:600">${esc(qLabel)} Progress</div>
         <div style="font-family:var(--mono);font-size:13px;color:${color}">${pct}%</div>
       </div>
       <div class="prog-bar" style="height:8px">
@@ -1626,39 +1647,78 @@ function renderAssignees() {
 // ═══════════════════════════════════════════════════════════════════════
 // LABELS TAB
 // ═══════════════════════════════════════════════════════════════════════
+function getLabelHiddenGroups() {
+  try { return new Set(JSON.parse(localStorage.getItem('epicdash_hidden_label_groups') || '[]')); }
+  catch(e) { return new Set(); }
+}
+function saveLabelHiddenGroups(set) {
+  try { localStorage.setItem('epicdash_hidden_label_groups', JSON.stringify([...set])); } catch(e) {}
+}
+function toggleLabelGroup(group) {
+  const hidden = getLabelHiddenGroups();
+  hidden.has(group) ? hidden.delete(group) : hidden.add(group);
+  saveLabelHiddenGroups(hidden);
+  renderLabels();
+}
+
 function renderLabels() {
-  // Use the label color cache derived from actual issue labels (no group API needed)
   const colorMap = S.labelColorCache;
+  const hidden   = getLabelHiddenGroups();
 
-  // Group by scope prefix
-  const groups = new Map(); // prefix → [{label, count}]
-  const usage  = new Map();
-  S.filteredIssues.forEach(i => i.labels.forEach(l => usage.set(l,(usage.get(l)||0)+1)));
+  // Collect usage from filtered issues + their epic labels
+  const usage = new Map();
+  S.filteredIssues.forEach(i => {
+    i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1));
+    // Also count epic labels so they appear in the analysis
+    (i.epicLabels||[]).forEach(l => usage.set(l, (usage.get(l)||0)+1));
+  });
 
+  // Group by scope
+  const groups = new Map();
   usage.forEach((cnt, lbl) => {
     const idx = lbl.indexOf('::');
     const group = idx > 0 ? lbl.slice(0, idx) : '(plain)';
     if (!groups.has(group)) groups.set(group, []);
-    groups.get(group).push({ lbl, val: idx>0?lbl.slice(idx+2):lbl, cnt });
+    groups.get(group).push({ lbl, val: idx>0 ? lbl.slice(idx+2) : lbl, cnt });
   });
 
-  let html = `<div style="font-size:13px;font-weight:600;margin-bottom:16px">Label Distribution — ${S.filteredIssues.length} issues</div>
+  const sortedGroups = [...groups.entries()].sort((a,b) => a[0].localeCompare(b[0]));
+  const hiddenCount  = sortedGroups.filter(([g]) => hidden.has(g)).length;
+
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:600">Label Distribution — ${S.filteredIssues.length} issues · ${sortedGroups.length} scopes</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${hiddenCount ? '<span style="font-size:11px;color:var(--muted)">' + hiddenCount + ' scope(s) hidden</span>' : ''}
+        <button onclick="(function(){var h=getLabelHiddenGroups();h.clear();saveLabelHiddenGroups(h);renderLabels();})()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:var(--sans)">Show all</button>
+      </div>
+    </div>
     <div class="label-analysis-grid">`;
 
-  [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([group, entries]) => {
-    const sorted = entries.sort((a,b)=>b.cnt-a.cnt);
-    const maxCnt = sorted[0]?.cnt || 1;
-    html += `<div class="label-group-card">
-      <div class="label-group-title">${esc(group)} <span style="color:var(--muted);font-size:10px">(${sorted.length})</span></div>
-      ${sorted.map(({lbl,val,cnt}) => {
-        const color = colorMap.get(lbl) || '#6B7280';
-        return `<div class="label-bar-row">
-          <div class="chip-dot" style="background:${color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
-          <div class="label-bar-name" title="${esc(lbl)}">${esc(val)}</div>
-          <div class="label-bar-track"><div class="label-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%;background:${color}66"></div></div>
-          <div class="label-bar-count">${cnt}</div>
-        </div>`;
-      }).join('')}
+  sortedGroups.forEach(([group, entries]) => {
+    const isHidden = hidden.has(group);
+    const sorted   = entries.sort((a,b) => b.cnt - a.cnt);
+    const maxCnt   = sorted[0]?.cnt || 1;
+    const safeGroup = group.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    html += `<div class="label-group-card" style="${isHidden ? 'opacity:0.45' : ''}">
+      <div class="label-group-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>${esc(group)} <span style="color:var(--muted);font-size:10px">(${sorted.length})</span></span>
+        <button onclick="toggleLabelGroup('${safeGroup}')" title="${isHidden ? 'Show' : 'Hide'} this scope"
+          style="background:none;border:none;cursor:pointer;font-size:13px;opacity:0.5;padding:0 2px;line-height:1">${isHidden ? '👁‍🗨' : '👁'}</button>
+      </div>
+      ${isHidden
+        ? '<div style="font-size:11px;color:var(--muted);padding:4px 0">Hidden — click 👁‍🗨 to show</div>'
+        : sorted.map(({lbl,val,cnt}) => {
+            const color = colorMap.get(lbl) || '#6B7280';
+            return `<div class="label-bar-row">
+              <div class="chip-dot" style="background:${color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
+              <div class="label-bar-name" title="${esc(lbl)}">${esc(val)}</div>
+              <div class="label-bar-track"><div class="label-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%;background:${color}66"></div></div>
+              <div class="label-bar-count">${cnt}</div>
+            </div>`;
+          }).join('')
+      }
     </div>`;
   });
 
