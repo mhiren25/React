@@ -939,8 +939,9 @@ function enrichIssue(i) {
     }
   });
 
-  // ── ESTIMATE: time_stats → epic labels → issue labels ──
-  // Check epic labels first (Estimate:: lives on the epic in most setups)
+  // ── ESTIMATE: label first (canonical), time_stats as fallback only ──
+  // We prefer the label value because time_stats uses GitLab's instance-configured
+  // week length (often 3d/week) which differs from the standard 5d person-week.
   const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size', 'Complexity'];
   function parseEstimate(labelList) {
     for (const lbl of labelList) {
@@ -951,7 +952,9 @@ function enrichIssue(i) {
         if (m) {
           const n = parseFloat(m[1]);
           const u = (m[2] || 'pd').toLowerCase();
-          return u.startsWith('w') ? Math.round(n * 5) : Math.round(n);
+          // pw = person-week, w = week, week/weeks — all = 5 person-days
+          const isWeek = u === 'w' || u === 'pw' || u === 'week' || u === 'weeks';
+          return isWeek ? Math.round(n * 5) : Math.round(n);
         }
       }
     }
@@ -959,10 +962,13 @@ function enrichIssue(i) {
   }
 
   let estimatePd = 0;
-  if (i.time_stats?.time_estimate) {
+  // Check epic labels first, then issue labels — label value is authoritative
+  estimatePd = parseEstimate(epicLabels) || parseEstimate(labels);
+  // Only fall back to time_stats if no estimate label found at all
+  if (!estimatePd && i.time_stats?.time_estimate) {
+    // GitLab stores seconds. Divide by 28800 (8h/day).
+    // Note: this may be off if your GitLab instance uses a non-standard week length.
     estimatePd = Math.round(i.time_stats.time_estimate / 28800);
-  } else {
-    estimatePd = parseEstimate(epicLabels) || parseEstimate(labels);
   }
 
   // ── STATUS: check issue labels (status lives on issues) ──
@@ -1314,31 +1320,53 @@ function applySavedFilter(idx) {
   const f = saved[idx];
   if (!f) return;
 
-  // Clear first
-  clearFilters();
+  // Clear current filters without triggering applyFilters yet
+  S.activeEpicLabels.clear();
+  S.activeIssueLabels.clear();
+  S.excludeEpicLabels.clear();
+  S.excludeIssueLabels.clear();
+  S.activeAssignees.clear();
+  document.getElementById('search-box').value = '';
 
-  // Re-apply saved state
+  // Restore saved state into S
   (f.incEpic  ||[]).forEach(l => S.activeEpicLabels.add(l));
   (f.excEpic  ||[]).forEach(l => S.excludeEpicLabels.add(l));
   (f.incIssue ||[]).forEach(l => S.activeIssueLabels.add(l));
   (f.excIssue ||[]).forEach(l => S.excludeIssueLabels.add(l));
   (f.assignees||[]).forEach(id => S.activeAssignees.add(id));
 
-  // Reflect state back onto chips
+  // Temporarily un-hide any scopes that contain active labels so chips are in the DOM
+  const allActiveLabels = [
+    ...S.activeEpicLabels, ...S.excludeEpicLabels,
+    ...S.activeIssueLabels, ...S.excludeIssueLabels,
+  ];
+  allActiveLabels.forEach(lbl => {
+    const idx = lbl.indexOf('::');
+    const scopeKey = idx > 0 ? lbl.slice(0, idx).trim().toLowerCase() : '__plain__';
+    S.hiddenScopes.delete(scopeKey); // un-hide so chip appears in DOM
+  });
+
+  // Rebuild sidebar (now all relevant scopes are visible)
+  buildSidebar();
+
+  // Reflect state onto chips
   document.querySelectorAll('.filter-chip[data-label]').forEach(el => {
     const lbl = el.dataset.label;
     const modeEl = el.querySelector('.chip-mode');
+    el.classList.remove('active', 'exclude');
+    if (modeEl) modeEl.textContent = '';
+
     const isEpicCtx = ['overview','milestones','risks','labels','assignees'].includes(S.activeTab);
     if (isEpicCtx) {
-      if (S.activeEpicLabels.has(lbl))  { el.classList.add('active');   el.classList.remove('exclude'); if(modeEl) modeEl.textContent='+'; }
-      if (S.excludeEpicLabels.has(lbl)) { el.classList.add('exclude');  el.classList.remove('active');  if(modeEl) modeEl.textContent='−'; }
+      if (S.activeEpicLabels.has(lbl))  { el.classList.add('active');  if(modeEl) modeEl.textContent='+'; }
+      if (S.excludeEpicLabels.has(lbl)) { el.classList.add('exclude'); if(modeEl) modeEl.textContent='−'; }
     } else {
-      if (S.activeIssueLabels.has(lbl))  { el.classList.add('active');  el.classList.remove('exclude'); if(modeEl) modeEl.textContent='+'; }
-      if (S.excludeIssueLabels.has(lbl)) { el.classList.add('exclude'); el.classList.remove('active');  if(modeEl) modeEl.textContent='−'; }
+      if (S.activeIssueLabels.has(lbl))  { el.classList.add('active');  if(modeEl) modeEl.textContent='+'; }
+      if (S.excludeIssueLabels.has(lbl)) { el.classList.add('exclude'); if(modeEl) modeEl.textContent='−'; }
     }
   });
   document.querySelectorAll('.filter-chip[data-assignee]').forEach(el => {
-    if (S.activeAssignees.has(parseInt(el.dataset.assignee))) el.classList.add('active');
+    el.classList.toggle('active', S.activeAssignees.has(parseInt(el.dataset.assignee)));
   });
 
   updateClearBtn();
