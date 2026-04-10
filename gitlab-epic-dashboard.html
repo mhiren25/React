@@ -821,6 +821,25 @@ function getEpicLabels(ep) {
     : [];
 }
 
+// Parse the estimate from an epic's own labels (Estimate:: scoped label)
+function getEpicEstimatePd(ep) {
+  const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size', 'Complexity'];
+  for (const lbl of (ep._labels || [])) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0 && ESTIMATE_SCOPES.includes(lbl.slice(0, idx).trim())) {
+      const raw = lbl.slice(idx + 2).trim();
+      const m = raw.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
+      if (m) {
+        const n = parseFloat(m[1]);
+        const u = (m[2] || 'pd').toLowerCase();
+        const isWeek = u === 'w' || u === 'pw' || u === 'week' || u === 'weeks';
+        return isWeek ? Math.round(n * 5) : Math.round(n);
+      }
+    }
+  }
+  return 0;
+}
+
 async function fetchAll() {
   const base = `${S.host}/api/v4`;
   const enc  = encodeURIComponent(S.groupPath);
@@ -939,9 +958,9 @@ function enrichIssue(i) {
     }
   });
 
-  // ── ESTIMATE: label first (canonical), time_stats as fallback only ──
-  // We prefer the label value because time_stats uses GitLab's instance-configured
-  // week length (often 3d/week) which differs from the standard 5d person-week.
+  // ── ESTIMATE: from issue's own labels/time_stats only ──
+  // Epic-level estimates (Estimate:: on the epic) are read separately in rendering
+  // and must NOT be stamped onto every issue — that would multiply the value by issue count.
   const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size', 'Complexity'];
   function parseEstimate(labelList) {
     for (const lbl of labelList) {
@@ -952,7 +971,6 @@ function enrichIssue(i) {
         if (m) {
           const n = parseFloat(m[1]);
           const u = (m[2] || 'pd').toLowerCase();
-          // pw = person-week, w = week, week/weeks — all = 5 person-days
           const isWeek = u === 'w' || u === 'pw' || u === 'week' || u === 'weeks';
           return isWeek ? Math.round(n * 5) : Math.round(n);
         }
@@ -962,12 +980,9 @@ function enrichIssue(i) {
   }
 
   let estimatePd = 0;
-  // Check epic labels first, then issue labels — label value is authoritative
-  estimatePd = parseEstimate(epicLabels) || parseEstimate(labels);
-  // Only fall back to time_stats if no estimate label found at all
+  // Issue labels only — never epic labels for per-issue estimate
+  estimatePd = parseEstimate(labels);
   if (!estimatePd && i.time_stats?.time_estimate) {
-    // GitLab stores seconds. Divide by 28800 (8h/day).
-    // Note: this may be off if your GitLab instance uses a non-standard week length.
     estimatePd = Math.round(i.time_stats.time_estimate / 28800);
   }
 
@@ -1479,13 +1494,22 @@ function renderOverview() {
   const closed  = fi.filter(i=>i.state==='closed').length;
   const open    = total - closed;
   const blocked = fi.filter(i=>i.isBlocked).length;
-  const noEst   = fi.filter(i=>!i.estimatePd).length;
   const noAss   = fi.filter(i=>!(i.assignees||[]).length).length;
-  const totalPd = fi.reduce((s,i)=>s+(i.estimatePd||0),0);
-  const donePd  = fi.filter(i=>i.state==='closed').reduce((s,i)=>s+(i.estimatePd||0),0);
+
+  // Estimates live on epics — sum epic estimates across filtered epics
+  // An epic counts as "estimated" if it has an Estimate:: label
+  const totalPd  = fe.reduce((s,{epic}) => s + getEpicEstimatePd(epic), 0);
+  const noEst    = fe.filter(({epic}) => !getEpicEstimatePd(epic)).length;
+  // "Done pd" = sum of estimates for epics that are fully closed (all filtered issues closed)
+  const donePd   = fe.reduce((s,{epic, issues}) => {
+    const epFiltered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
+    const allClosed  = epFiltered.length > 0 && epFiltered.every(i=>i.state==='closed');
+    return s + (allClosed ? getEpicEstimatePd(epic) : 0);
+  }, 0);
+
   const pct     = total ? Math.round(closed/total*100) : 0;
   const color   = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';
-  const qLabel = S.activeEpicLabels.size ? [...S.activeEpicLabels].join(' & ') : 'All Epics';
+  const qLabel  = S.activeEpicLabels.size ? [...S.activeEpicLabels].join(' & ') : 'All Epics';
 
   let kpisHTML = `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
@@ -1536,7 +1560,7 @@ function renderOverview() {
 
     const epicClosed  = filtered.filter(i=>i.state==='closed').length;
     const epicPct     = filtered.length ? Math.round(epicClosed/filtered.length*100) : 0;
-    const epicPd      = filtered.reduce((s,i)=>s+(i.estimatePd||0),0);
+    const epicPd      = getEpicEstimatePd(epic);  // estimate lives on the epic, not on individual issues
     const epicBlocked = filtered.filter(i=>i.isBlocked).length;
     const epicPcol    = epicPct>=75?'var(--green)':epicPct>=40?'var(--yellow)':'var(--accent)';
 
@@ -1610,7 +1634,7 @@ function renderIssues() {
 
     const closed  = filtered.filter(i=>i.state==='closed').length;
     const blocked = filtered.filter(i=>i.isBlocked).length;
-    const totalPd = filtered.reduce((s,i)=>s+(i.estimatePd||0),0);
+    const totalPd = getEpicEstimatePd(epic);  // estimate is on the epic
 
     const epicLabels = Array.isArray(epic.labels) ? epic.labels.map(l=>typeof l==='string'?l:l.name) : [];
     const rankLabel  = epicLabels.find(l=>/^Rank::/i.test(l));
