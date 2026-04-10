@@ -1,0 +1,7 @@
+S.allIssues.filter(i => i.estimatePd > 0).slice(0, 10).map(i => ({
+  title: i.title.slice(0,40),
+  estimatePd: i.estimatePd,
+  epicLabels: i.epicLabels,
+  issueLabels: i.labels,
+  time_stats: i.time_stats
+}))
