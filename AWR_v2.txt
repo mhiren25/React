@@ -20,3 +20,78 @@ A file picker opens. Select your AWR .html file. Then ask away:
 @awr what are the top wait events?
 @awr /top sql
 @awr are there latch contention issues?
+
+Here are the exact steps from scratch:
+
+## Prerequisites (install once)
+
+**1. Install Node.js** (v18 or higher)
+```bash
+node --version   # check if already installed
+```
+Download from https://nodejs.org if not installed.
+
+**2. Install vsce** (VS Code extension packager)
+```bash
+npm install -g @vscode/vsce
+```
+
+---
+
+## Build steps
+
+**3. Unzip the source**
+```bash
+unzip awr-copilot-source.zip -d awr-copilot
+cd awr-copilot
+```
+
+**4. Install dependencies**
+```bash
+npm install
+```
+This downloads TypeScript and the VS Code type definitions into `node_modules/`.
+
+**5. Compile TypeScript → JavaScript**
+```bash
+npm run compile
+```
+This runs `tsc -p ./` and produces the `out/` folder with `.js` files.
+
+**6. Package into .vsix**
+```bash
+npm run package
+```
+This runs `vsce package --no-dependencies --allow-missing-repository` and produces:
+```
+awr-copilot-participant-0.1.0.vsix
+```
+
+---
+
+## Full sequence copy-paste
+```bash
+unzip awr-copilot-source.zip -d awr-copilot
+cd awr-copilot
+npm install
+npm run compile
+npm run package
+```
+
+That's it — the `.vsix` appears in the same folder. Then install it in VS Code via `Extensions → ⋯ → Install from VSIX`.
+
+---
+
+## If you make code changes
+
+After editing any `.ts` file in `src/`, just re-run steps 5 and 6:
+```bash
+npm run compile
+npm run package
+```
+
+Or use watch mode during development so it recompiles automatically on every save:
+```bash
+npm run watch
+```
+Then press `F5` in VS Code to launch a live Extension Development Host to test without packaging.
