@@ -1,0 +1,22 @@
+Setting up in VS Code
+Step 1: Install the .vsix
+
+Open VS Code
+Press Ctrl+Shift+X to open Extensions
+Click the ⋯ (three dots) at the top right of the Extensions panel
+Select Install from VSIX...
+Pick the awr-copilot-participant-0.1.0.vsix file you downloaded
+
+Step 2: Verify GitHub Copilot Chat is working
+This extension uses your existing Copilot subscription — no API key needed. Just make sure:
+
+The GitHub Copilot and GitHub Copilot Chat extensions are installed and you're signed in
+You can already use @workspace or other participants in Copilot Chat
+
+Step 3: Use it
+Open Copilot Chat (Ctrl+Alt+I) and type:
+@awr /load
+A file picker opens. Select your AWR .html file. Then ask away:
+@awr what are the top wait events?
+@awr /top sql
+@awr are there latch contention issues?
