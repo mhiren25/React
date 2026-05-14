@@ -1,35 +1,37 @@
+name: My Local Config
+version: 1.0.0
+schema: v1
+
 models:
-  - title: Company Azure LLM
-    provider: openai
+  - name: Company Azure LLM
+    provider: azure
     model: your-model-name
-    apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/
-    apiType: azure
-    apiVersion: "2024-02-01"
-    apiKey: YOUR_AZURE_API_KEY
-    deployment: your-deployment-name
+    env:
+      apiKey: YOUR_AZURE_API_KEY
+    apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/openai/deployments/your-deployment-name
     contextLength: 128000
+    roles:
+      - chat
+      - edit
+      - agent
 
 tabAutocompleteModel:
-  title: Company Azure LLM Autocomplete
-  provider: openai
+  name: Company Azure LLM Autocomplete
+  provider: azure
   model: your-model-name
-  apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/
-  apiType: azure
-  apiVersion: "2024-02-01"
-  apiKey: YOUR_AZURE_API_KEY
-  deployment: your-deployment-name
+  env:
+    apiKey: YOUR_AZURE_API_KEY
+  apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/openai/deployments/your-deployment-name
 
 embeddingsProvider:
-  provider: openai
+  provider: azure
   model: text-embedding-ada-002
-  apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/
-  apiType: azure
-  apiVersion: "2024-02-01"
-  apiKey: YOUR_AZURE_API_KEY
+  env:
+    apiKey: YOUR_AZURE_API_KEY
+  apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/openai/deployments/text-embedding-ada-002
 
 contextProviders:
   - name: file
-    params: {}
   - name: codebase
     params:
       nRetrieve: 30
