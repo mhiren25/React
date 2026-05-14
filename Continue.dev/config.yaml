@@ -1,0 +1,40 @@
+models:
+  - title: Company Azure LLM
+    provider: openai
+    model: your-model-name
+    apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/
+    apiType: azure
+    apiVersion: "2024-02-01"
+    apiKey: YOUR_AZURE_API_KEY
+    deployment: your-deployment-name
+    contextLength: 128000
+
+tabAutocompleteModel:
+  title: Company Azure LLM Autocomplete
+  provider: openai
+  model: your-model-name
+  apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/
+  apiType: azure
+  apiVersion: "2024-02-01"
+  apiKey: YOUR_AZURE_API_KEY
+  deployment: your-deployment-name
+
+embeddingsProvider:
+  provider: openai
+  model: text-embedding-ada-002
+  apiBase: https://YOUR-AZURE-ENDPOINT.openai.azure.com/
+  apiType: azure
+  apiVersion: "2024-02-01"
+  apiKey: YOUR_AZURE_API_KEY
+
+contextProviders:
+  - name: file
+    params: {}
+  - name: codebase
+    params:
+      nRetrieve: 30
+      nFinal: 10
+
+docs:
+  - title: Project Spec
+    startUrl: file:///path/to/your/project/spec.md
