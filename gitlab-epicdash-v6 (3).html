@@ -1,0 +1,2195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>EpicDash — GitLab Quarter Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0C0D10;
+  --surface:   #13151A;
+  --surface2:  #1C1F28;
+  --border:    #252830;
+  --border2:   #2E3240;
+  --text:      #E8EAF0;
+  --muted:     #6B7280;
+  --accent:    #FC6D26;
+  --accent2:   #E8431A;
+  --green:     #22C55E;
+  --blue:      #3B82F6;
+  --yellow:    #EAB308;
+  --red:       #EF4444;
+  --purple:    #A855F7;
+  --teal:      #14B8A6;
+  --mono:      'Space Mono', monospace;
+  --sans:      'DM Sans', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; min-height: 100vh; overflow-x: hidden; }
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+/* ── SPINNER ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.9s linear infinite; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── SETUP SCREEN ── */
+#setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(252,109,38,0.12), transparent);
+}
+.setup-card {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px;
+}
+.setup-logo { font-family: var(--mono); font-size: 28px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
+.setup-logo span { color: var(--accent); }
+.setup-sub { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+.field-group { margin-bottom: 20px; }
+.field-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; display: block; }
+.field-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.field-input:focus { border-color: var(--accent); }
+.field-input::placeholder { color: var(--muted); }
+.role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.role-btn {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 14px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  color: var(--text);
+  font-family: var(--sans);
+}
+.role-btn .role-icon { font-size: 22px; display: block; margin-bottom: 6px; }
+.role-btn .role-name { font-size: 12px; font-weight: 600; display: block; }
+.role-btn:hover { border-color: var(--accent); background: rgba(252,109,38,0.05); }
+.role-btn.selected { border-color: var(--accent); background: rgba(252,109,38,0.12); color: var(--accent); }
+.submit-btn {
+  width: 100%;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.submit-btn:hover { background: var(--accent2); }
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.setup-error { color: var(--red); font-size: 13px; margin-top: 12px; display: none; }
+.saved-badge { font-size: 11px; color: var(--green); background: rgba(34,197,94,0.1); padding: 3px 8px; border-radius: 20px; margin-left: 8px; display: none; }
+.forget-link { font-size: 11px; color: var(--muted); text-decoration: underline; cursor: pointer; display: none; margin-top: 8px; }
+.forget-link:hover { color: var(--red); }
+
+/* ── LOADING ── */
+#loading-screen {
+  display: none;
+  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+.loader-ring { width: 52px; height: 52px; border: 3px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; }
+.loader-text { color: var(--muted); font-size: 13px; font-family: var(--mono); }
+
+/* ── MAIN SHELL ── */
+#app { display: none; height: 100vh; flex-direction: column; }
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-logo { font-family: var(--mono); font-weight: 700; font-size: 16px; letter-spacing: -0.5px; flex-shrink: 0; }
+.topbar-logo span { color: var(--accent); }
+.topbar-group { font-size: 12px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
+.quarter-pill {
+  background: rgba(252,109,38,0.12);
+  border: 1px solid rgba(252,109,38,0.3);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--mono);
+  padding: 3px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.spacer { flex: 1; }
+.role-badge-top {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.05em;
+}
+.topbar-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.topbar-btn:hover { border-color: var(--border2); color: var(--text); }
+.topbar-btn.spinning .btn-icon { animation: spin 0.9s linear infinite; display: inline-block; }
+
+/* ── BODY LAYOUT ── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-search {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-search input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  outline: none;
+}
+.sidebar-search input:focus { border-color: var(--accent); }
+.sidebar-search input::placeholder { color: var(--muted); }
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+.filter-section { margin-bottom: 20px; }
+.filter-section-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.filter-section-count { background: var(--surface2); border-radius: 10px; padding: 1px 6px; font-size: 10px; color: var(--muted); }
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-size: 12px;
+  user-select: none;
+  border: 1px solid transparent;
+}
+.filter-chip:hover { background: var(--surface2); }
+.filter-chip.active  { background: rgba(252,109,38,0.1); border-color: rgba(252,109,38,0.25); color: var(--accent); }
+.filter-chip.exclude { background: rgba(239,68,68,0.1);  border-color: rgba(239,68,68,0.3);   color: var(--red); }
+.filter-chip .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.filter-chip .chip-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-chip .chip-count { font-size: 10px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
+.filter-chip.active .chip-count  { color: var(--accent); }
+.filter-chip.exclude .chip-count { color: var(--red); }
+.filter-chip .chip-mode { font-size: 10px; font-weight: 700; width: 12px; text-align: center; flex-shrink: 0; }
+/* Saved filters */
+.saved-filter-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 6px; border-radius: 7px; font-size: 12px;
+  background: var(--surface2); border: 1px solid var(--border); margin-bottom: 4px;
+}
+.saved-filter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.saved-filter-btn {
+  background: none; border: none; cursor: pointer; font-size: 11px;
+  padding: 2px 6px; border-radius: 5px; font-family: var(--sans);
+}
+.saved-filter-apply { color: var(--accent); }
+.saved-filter-apply:hover { background: rgba(252,109,38,0.12); }
+.saved-filter-del { color: var(--muted); }
+.saved-filter-del:hover { color: var(--red); }
+.avatar-placeholder { width: 20px; height: 20px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--muted); flex-shrink: 0; }
+.clear-filters-btn {
+  width: 100%;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 7px;
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--sans);
+  transition: all 0.15s;
+  margin-bottom: 12px;
+}
+.clear-filters-btn:hover { border-color: var(--red); color: var(--red); }
+
+/* ── MAIN CONTENT ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── TABS ── */
+.tab-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  gap: 0;
+  flex-shrink: 0;
+}
+.tab-item {
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab-item:hover { color: var(--text); }
+.tab-item.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-badge { background: var(--surface2); border-radius: 10px; padding: 1px 6px; font-size: 10px; font-family: var(--mono); }
+.tab-item.active .tab-badge { background: rgba(252,109,38,0.15); color: var(--accent); }
+
+/* ── TAB PANELS ── */
+.tab-panel { display: none; flex: 1; overflow-y: auto; padding: 24px; }
+.tab-panel.active { display: block; }
+
+/* ── KPI ROW ── */
+.kpi-row { display: grid; gap: 14px; margin-bottom: 24px; }
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+  transition: border-color 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.kpi-card:hover { border-color: var(--border2); }
+.kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+.kpi-value { font-family: var(--mono); font-size: 28px; font-weight: 700; line-height: 1; }
+.kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.kpi-accent { color: var(--accent); }
+.kpi-green { color: var(--green); }
+.kpi-red { color: var(--red); }
+.kpi-blue { color: var(--blue); }
+.kpi-yellow { color: var(--yellow); }
+.kpi-purple { color: var(--purple); }
+
+/* ── PROGRESS BAR ── */
+.prog-bar { height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+.prog-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+.prog-label { font-size: 11px; color: var(--muted); margin-top: 4px; text-align: right; }
+
+/* ── SECTION HEADER ── */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.section-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.section-meta { font-size: 11px; color: var(--muted); }
+
+/* ── EPIC CARDS ── */
+.epic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.epic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px;
+  transition: border-color 0.15s;
+}
+.epic-card:hover { border-color: var(--border2); }
+.epic-title { font-size: 14px; font-weight: 600; color: var(--text); text-decoration: none; display: block; margin-bottom: 4px; }
+.epic-title:hover { color: var(--accent); }
+.epic-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-bottom: 12px; }
+.epic-stats { display: flex; gap: 12px; font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+.epic-stat { display: flex; align-items: center; gap: 4px; }
+.epic-labels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.label-chip {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: #fff;
+  opacity: 0.85;
+}
+
+/* ── ISSUE ROWS ── */
+.issue-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.issue-group-header {
+  padding: 12px 16px;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.issue-group-header:hover { background: rgba(255,255,255,0.03); }
+.issue-group-title { font-size: 13px; font-weight: 600; flex: 1; }
+.issue-group-meta { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.collapse-icon { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+.issue-group.collapsed .collapse-icon { transform: rotate(-90deg); }
+.issue-group.collapsed .issue-list { display: none; }
+.issue-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text);
+  transition: background 0.1s;
+  font-size: 13px;
+}
+.issue-row:hover { background: rgba(255,255,255,0.02); }
+.issue-id { font-family: var(--mono); font-size: 11px; color: var(--muted); flex-shrink: 0; min-width: 48px; }
+.issue-title-cell { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue-chips { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }
+.state-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.state-open { background: var(--green); }
+.state-closed { background: var(--muted); }
+.badge { font-size: 10px; padding: 1px 7px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+.badge-mr { background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); }
+.badge-blocked { background: rgba(239,68,68,0.15); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+.badge-review { background: rgba(168,85,247,0.15); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+.badge-done { background: rgba(34,197,94,0.12); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+.badge-inprogress { background: rgba(59,130,246,0.12); color: var(--blue); border: 1px solid rgba(59,130,246,0.25); }
+.est-label { font-size: 11px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; }
+.assignee-avatars { display: flex; gap: -4px; }
+.assignee-avatars img { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--bg); margin-left: -4px; }
+.assignee-avatars img:first-child { margin-left: 0; }
+
+/* ── ASSIGNEE SECTION ── */
+.assignee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.assignee-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.assignee-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.assignee-avatar { width: 36px; height: 36px; border-radius: 50%; }
+.assignee-name { font-weight: 600; font-size: 14px; }
+.assignee-stats { font-size: 11px; color: var(--muted); }
+.workload-bar { height: 6px; background: var(--surface2); border-radius: 6px; overflow: hidden; margin: 8px 0; }
+.workload-fill { height: 100%; border-radius: 6px; }
+.assignee-issues { margin-top: 10px; space-y: 4px; }
+.assignee-issue-row { font-size: 12px; padding: 4px 0; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 6px; text-decoration: none; color: var(--text); }
+.assignee-issue-row:first-child { border-top: none; }
+.assignee-issue-row:hover { color: var(--accent); }
+
+/* ── LABEL ANALYSIS ── */
+.label-analysis-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px; }
+.label-group-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+}
+.label-group-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 12px; }
+.label-bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.label-bar-name { font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.label-bar-track { flex: 0 0 80px; height: 4px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.label-bar-fill { height: 100%; border-radius: 4px; }
+.label-bar-count { font-size: 11px; color: var(--muted); font-family: var(--mono); flex-shrink: 0; min-width: 20px; text-align: right; }
+
+/* ── RISK PANEL ── */
+.risk-list { display: flex; flex-direction: column; gap: 8px; }
+.risk-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--red);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: background 0.1s;
+}
+.risk-item:hover { background: var(--surface2); }
+.risk-item.warn { border-left-color: var(--yellow); }
+.risk-item.info { border-left-color: var(--blue); }
+
+/* ── EMPTY STATE ── */
+.empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-icon { font-size: 36px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
+
+/* ── QUARTER INPUT ── */
+.quarter-input-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+.quarter-input-row label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.quarter-input-row input {
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  width: 140px;
+}
+.quarter-input-row input:focus { border-color: var(--accent); }
+.quarter-input-row button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.quarter-input-row button:hover { background: var(--accent2); }
+
+/* ── TOOLTIP ── */
+.tooltip { position: relative; }
+.tooltip:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* ── HELPER ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ SETUP SCREEN ═══════════════════════════════ -->
+<div id="setup-screen">
+  <div class="setup-card fade-in">
+    <div class="setup-logo">Epic<span>Dash</span> <span class="saved-badge" id="saved-badge">● Saved</span></div>
+    <div class="setup-sub">GitLab Quarter Dashboard — PO / SM / DEV / QA</div>
+
+    <div class="field-group">
+      <label class="field-label">GitLab Group URL</label>
+      <input class="field-input" id="s-url" type="text" placeholder="https://gitlab.com/my-group" autocomplete="off"/>
+    </div>
+    <div class="field-group">
+      <label class="field-label">Personal Access Token</label>
+      <input class="field-input" id="s-pat" type="password" placeholder="glpat-…" autocomplete="off"/>
+    </div>
+
+    <div class="field-group">
+      <label class="field-label">Your Role</label>
+      <div class="role-grid">
+        <button class="role-btn" data-role="PO" onclick="selectRole(this)">
+          <span class="role-icon">🎯</span>
+          <span class="role-name">Product Owner</span>
+        </button>
+        <button class="role-btn" data-role="SM" onclick="selectRole(this)">
+          <span class="role-icon">🧭</span>
+          <span class="role-name">Scrum Master</span>
+        </button>
+        <button class="role-btn" data-role="DEV" onclick="selectRole(this)">
+          <span class="role-icon">💻</span>
+          <span class="role-name">Developer</span>
+        </button>
+        <button class="role-btn" data-role="QA" onclick="selectRole(this)">
+          <span class="role-icon">🔍</span>
+          <span class="role-name">QA Engineer</span>
+        </button>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="load-btn" onclick="startLoad()">Load Dashboard</button>
+    <div class="setup-error" id="setup-error"></div>
+    <div style="text-align:center">
+      <span class="forget-link" id="forget-link" onclick="forgetConfig()">Forget saved config</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ LOADING ═══════════════════════════════ -->
+<div id="loading-screen" style="display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+  <div class="loader-ring spin"></div>
+  <div class="loader-text" id="load-status">Connecting to GitLab…</div>
+</div>
+
+<!-- ═══════════════════════════════ APP ═══════════════════════════════ -->
+<div id="app" style="display:none;height:100vh;flex-direction:column;">
+
+  <!-- TOP BAR -->
+  <header class="topbar">
+    <div class="topbar-logo">Epic<span>Dash</span></div>
+    <div class="topbar-group" id="tb-group"></div>
+    <div class="spacer"></div>
+    <div class="role-badge-top" id="tb-role"></div>
+    <button class="topbar-btn" id="refresh-btn" onclick="refreshData()" data-tip="Re-fetch from GitLab">
+      <span class="btn-icon">↻</span> Refresh
+    </button>
+    <button class="topbar-btn" onclick="changeConfig()">⚙ Settings</button>
+  </header>
+
+  <div class="app-body">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-search">
+        <input type="text" placeholder="Search issues…" id="search-box" oninput="applyFilters()"/>
+      </div>
+      <div class="sidebar-scroll">
+        <button class="clear-filters-btn" onclick="clearFilters()" id="clear-btn" style="display:none">✕ Clear filters</button>
+
+        <!-- Saved Filters -->
+        <div class="filter-section" id="fs-saved">
+          <div class="filter-section-title">
+            Saved Filters
+            <button onclick="saveCurrentFilters()" title="Save current filters"
+              style="background:rgba(252,109,38,0.12);border:1px solid rgba(252,109,38,0.3);color:var(--accent);border-radius:5px;padding:1px 8px;font-size:10px;cursor:pointer;font-family:var(--sans)">+ Save</button>
+          </div>
+          <div id="saved-filters-list"></div>
+        </div>
+
+        <!-- Dynamic filter sections injected here by buildSidebar() -->
+
+        <!-- Assignees (always shown) -->
+        <div class="filter-section" id="fs-assignees">
+          <div class="filter-section-title">Assignees <span class="filter-section-count" id="fs-assignees-count"></span></div>
+          <div id="filter-assignees"></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="main">
+      <!-- TAB BAR (role-driven) -->
+      <div class="tab-bar" id="tab-bar"></div>
+
+      <!-- TAB PANELS -->
+      <div id="panel-overview" class="tab-panel active" style="display:none"></div>
+      <div id="panel-issues"   class="tab-panel" style="display:none"></div>
+      <div id="panel-assignees" class="tab-panel" style="display:none"></div>
+      <div id="panel-labels"   class="tab-panel" style="display:none"></div>
+      <div id="panel-risks"    class="tab-panel" style="display:none"></div>
+      <div id="panel-milestones" class="tab-panel" style="display:none"></div>
+      <div id="panel-vm15"     class="tab-panel" style="display:none"></div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════
+const S = {
+  host: '', groupPath: '', pat: '', role: '',
+  // All data loaded from GitLab
+  allEpics: [],    // all epics with their issues and labels
+  allIssues: [],   // all issues across all epics
+  // Filtered views — rebuilt on every filter change
+  filteredEpics: [],   // epics matching current epic-label filters
+  filteredIssues: [],  // issues of filteredEpics matching current issue-label + search filters
+  milestones: [],
+  // Filters
+  activeEpicLabels: new Set(),    // epic labels to INCLUDE (epic must have all)
+  excludeEpicLabels: new Set(),   // epic labels to EXCLUDE (epic must have none)
+  activeIssueLabels: new Set(),   // issue labels to INCLUDE
+  excludeIssueLabels: new Set(),  // issue labels to EXCLUDE
+  activeAssignees: new Set(),
+  activeTab: 'overview',
+  vm15ViewMode: 'component', // 'component' | 'library'
+  hiddenScopes: new Set(),
+  labelColorCache: new Map(),
+};
+
+const ROLE_COLORS = { PO:'#FC6D26', SM:'#14B8A6', DEV:'#3B82F6', QA:'#A855F7' };
+const ROLE_LABELS = { PO:'Product Owner', SM:'Scrum Master', DEV:'Developer', QA:'QA Engineer' };
+
+// ═══════════════════════════════════════════════════════════════════════
+// SETUP / PERSISTENCE
+// ═══════════════════════════════════════════════════════════════════════
+let selectedRole = '';
+
+function selectRole(btn) {
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedRole = btn.dataset.role;
+}
+
+function loadSaved() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('epicdash_cfg') || '{}');
+    if (cfg.url)  document.getElementById('s-url').value = cfg.url;
+    if (cfg.pat)  document.getElementById('s-pat').value = cfg.pat;
+    if (cfg.role) {
+      const btn = document.querySelector(`.role-btn[data-role="${cfg.role}"]`);
+      if (btn) selectRole(btn);
+    }
+    if (Array.isArray(cfg.hiddenScopes)) S.hiddenScopes = new Set(cfg.hiddenScopes);
+    if (cfg.url || cfg.pat) {
+      document.getElementById('saved-badge').style.display = 'inline';
+      document.getElementById('forget-link').style.display = 'inline';
+    }
+  } catch(e) {}
+}
+
+function saveConfig() {
+  localStorage.setItem('epicdash_cfg', JSON.stringify({
+    url: S.host + '/' + S.groupPath,
+    pat: S.pat,
+    role: S.role,
+    hiddenScopes: [...S.hiddenScopes],
+  }));
+}
+
+function forgetConfig() {
+  localStorage.removeItem('epicdash_cfg');
+  ['s-url','s-pat'].forEach(id => document.getElementById(id).value = '');
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  selectedRole = '';
+  document.getElementById('saved-badge').style.display = 'none';
+  document.getElementById('forget-link').style.display = 'none';
+}
+
+function changeConfig() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('setup-screen').style.display = 'flex';
+  loadSaved();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// API
+// ═══════════════════════════════════════════════════════════════════════
+async function glFetch(url) {
+  let results = [], next = url;
+  while (next) {
+    const res = await fetch(next, { headers: { 'PRIVATE-TOKEN': S.pat } });
+    if (!res.ok) throw new Error(`GitLab ${res.status} — ${res.statusText}`);
+    const data = await res.json();
+    if (Array.isArray(data)) results = results.concat(data);
+    else return data;
+    const link = res.headers.get('Link') || '';
+    next = link.match(/<([^>]+)>;\s*rel="next"/)?.[1] || null;
+  }
+  return results;
+}
+
+function setStatus(msg) { document.getElementById('load-status').textContent = msg; }
+
+// ═══════════════════════════════════════════════════════════════════════
+// LOAD
+// ═══════════════════════════════════════════════════════════════════════
+async function startLoad() {
+  const urlRaw = document.getElementById('s-url').value.trim();
+  const pat    = document.getElementById('s-pat').value.trim();
+  if (!urlRaw || !pat || !selectedRole) {
+    showErr('Please fill GitLab URL, token, and select a role.');
+    return;
+  }
+  let host, groupPath;
+  try {
+    const u = new URL(urlRaw);
+    host = u.origin;
+    groupPath = u.pathname.replace(/^\/groups\//, '').replace(/^\//, '').replace(/\/$/, '');
+  } catch { showErr('Invalid GitLab URL'); return; }
+
+  S.host = host; S.groupPath = groupPath; S.pat = pat; S.role = selectedRole;
+
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('loading-screen').style.display = 'flex';
+  try {
+    await fetchAll();
+    saveConfig();
+    buildApp();
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+  } catch(err) {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+    showErr('Failed: ' + err.message);
+  }
+}
+
+// Collect unique non-closed milestones from a list of issues
+function deriveMilestonesFromIssues(issues) {
+  const seen = new Map(); // milestone id → milestone object
+  issues.forEach(i => {
+    if (!i.milestone) return;
+    if (i.milestone.state === 'closed') return;
+    if (!seen.has(i.milestone.id)) seen.set(i.milestone.id, i.milestone);
+  });
+  return [...seen.values()].sort((a, b) => {
+    if (!a.due_date && !b.due_date) return 0;
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return new Date(a.due_date) - new Date(b.due_date);
+  });
+}
+
+// Extract labels array from an epic
+function getEpicLabels(ep) {
+  return Array.isArray(ep.labels)
+    ? ep.labels.map(l => typeof l === 'string' ? l : (l.name || '')).filter(Boolean)
+    : [];
+}
+
+// Parse the estimate from an epic's own labels (Estimate:: scoped label)
+function getEpicEstimatePd(ep) {
+  const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size', 'Complexity'];
+  for (const lbl of (ep._labels || [])) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0 && ESTIMATE_SCOPES.includes(lbl.slice(0, idx).trim())) {
+      const raw = lbl.slice(idx + 2).trim();
+      const m = raw.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
+      if (m) {
+        const n = parseFloat(m[1]);
+        const u = (m[2] || 'pd').toLowerCase();
+        const isWeek = u === 'w' || u === 'pw' || u === 'week' || u === 'weeks';
+        return isWeek ? Math.round(n * 5) : Math.round(n);
+      }
+    }
+  }
+  return 0;
+}
+
+async function fetchAll() {
+  const base = `${S.host}/api/v4`;
+  const enc  = encodeURIComponent(S.groupPath);
+
+  setStatus('Loading epics…');
+  const allEpicsRaw = await glFetch(`${base}/groups/${enc}/epics?state=opened&per_page=100`);
+
+  setStatus(`Loading issues for ${allEpicsRaw.length} epic(s)…`);
+  const epicData = await Promise.all(allEpicsRaw.map(async ep => {
+    const epicLabels = getEpicLabels(ep);
+    ep._labels = epicLabels;
+    const issues = await glFetch(`${base}/groups/${enc}/epics/${ep.iid}/issues?per_page=100`);
+    const enriched = await Promise.all(issues.map(async i => {
+      let mrCount = i.merge_requests_count || 0;
+      if (!mrCount && i.project_id && i.iid) {
+        try {
+          const mrs = await glFetch(`${base}/projects/${i.project_id}/issues/${i.iid}/related_merge_requests?per_page=5`);
+          mrCount = Array.isArray(mrs) ? mrs.length : 0;
+        } catch(e) { mrCount = 0; }
+      }
+      return enrichIssue({ ...i, _mrCount: mrCount, _epicLabels: epicLabels });
+    }));
+    return { epic: ep, issues: enriched };
+  }));
+
+  S.allEpics  = epicData;
+  S.allIssues = epicData.flatMap(e => e.issues);
+  // Initial state: everything visible
+  S.filteredEpics  = [...S.allEpics];
+  S.filteredIssues = [...S.allIssues];
+
+  // Derive milestones from issues — collect unique non-closed milestones referenced by issues
+  S.milestones = deriveMilestonesFromIssues(S.filteredIssues);
+
+  // Build label color cache from all labels (issues + epics)
+  S.labelColorCache = new Map();
+  const allLabelNames = new Set();
+  S.allIssues.forEach(i => i.labels.forEach(l => allLabelNames.add(l)));
+  allEpicsRaw.forEach(ep => (ep._labels||[]).forEach(l => allLabelNames.add(l)));
+  allLabelNames.forEach(name => S.labelColorCache.set(name, autoColor(name)));
+
+  // Debug
+  console.group('EpicDash — loaded');
+  console.log(`Epics: ${S.allEpics.length}, Issues: ${S.allIssues.length}, Milestones: ${S.milestones.length}`);
+  const epicScopes = new Map();
+  allEpicsRaw.forEach(ep => (ep._labels||[]).forEach(l => {
+    const s = l.includes('::') ? l.slice(0,l.indexOf('::')) : '(plain)';
+    if (!epicScopes.has(s)) epicScopes.set(s, new Set());
+    epicScopes.get(s).add(l);
+  }));
+  console.log('Epic label scopes:', [...epicScopes.entries()].map(([s,v])=>s+': '+[...v].join(', ')).join(' | '));
+  console.groupEnd();
+}
+
+async function refreshData() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  try {
+    await fetchAll();
+    applyFilters();
+  } catch(e) { alert('Refresh failed: ' + e.message); }
+  btn.classList.remove('spinning');
+  btn.disabled = false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LABEL COLOR — deterministic from label name, no API needed
+// ═══════════════════════════════════════════════════════════════════════
+function autoColor(name) {
+  // Well-known scope → palette
+  const scope = name.split('::')[0].toLowerCase();
+  const palettes = {
+    status:    ['#6366F1','#8B5CF6','#EC4899','#EF4444','#F97316','#EAB308','#22C55E','#14B8A6','#3B82F6'],
+    priority:  ['#EF4444','#F97316','#EAB308','#22C55E','#6B7280'],
+    type:      ['#3B82F6','#8B5CF6','#14B8A6','#EC4899','#F97316'],
+    component: ['#14B8A6','#3B82F6','#6366F1','#A855F7'],
+    area:      ['#14B8A6','#3B82F6','#6366F1','#A855F7'],
+    estimate:  ['#22C55E','#84CC16','#EAB308','#F97316','#EF4444'],
+    committed: ['#FC6D26','#E8431A'],
+    increment: ['#FC6D26','#E8431A'],
+  };
+  const pal = palettes[scope];
+  if (pal) {
+    let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return pal[h % pal.length];
+  }
+  // Generic: hash to hsl
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `hsl(${h % 360},45%,55%)`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// ENRICH ISSUE
+// ═══════════════════════════════════════════════════════════════════════
+function enrichIssue(i) {
+  const labels = Array.isArray(i.labels)
+    ? i.labels.map(l => typeof l === 'string' ? l : (l.name || '')).filter(Boolean)
+    : [];
+
+  // Epic labels passed in from fetchAll — Estimate/Rank labels live here
+  const epicLabels = Array.isArray(i._epicLabels) ? i._epicLabels : [];
+
+  const scopedMap = {};
+  const plainLabels = [];
+  labels.forEach(l => {
+    const idx = l.indexOf('::');
+    if (idx > 0) {
+      const scope = l.slice(0, idx).trim();
+      const val   = l.slice(idx + 2).trim();
+      if (!scopedMap[scope]) scopedMap[scope] = [];
+      scopedMap[scope].push(val);
+    } else {
+      plainLabels.push(l);
+    }
+  });
+
+  // ── ESTIMATE: from issue's own labels/time_stats only ──
+  // Epic-level estimates (Estimate:: on the epic) are read separately in rendering
+  // and must NOT be stamped onto every issue — that would multiply the value by issue count.
+  const ESTIMATE_SCOPES = ['Estimate', 'estimate', 'ESTIMATE', 'Story Points', 'SP', 'Size', 'Complexity'];
+  function parseEstimate(labelList) {
+    for (const lbl of labelList) {
+      const idx = lbl.indexOf('::');
+      if (idx > 0 && ESTIMATE_SCOPES.includes(lbl.slice(0, idx).trim())) {
+        const raw = lbl.slice(idx + 2).trim();
+        const m = raw.match(/^(\d+(?:\.\d+)?)\s*(pd|pw|sp|d|w|days?|weeks?|points?)?$/i);
+        if (m) {
+          const n = parseFloat(m[1]);
+          const u = (m[2] || 'pd').toLowerCase();
+          const isWeek = u === 'w' || u === 'pw' || u === 'week' || u === 'weeks';
+          return isWeek ? Math.round(n * 5) : Math.round(n);
+        }
+      }
+    }
+    return 0;
+  }
+
+  let estimatePd = 0;
+  // Issue labels only — never epic labels for per-issue estimate
+  estimatePd = parseEstimate(labels);
+  if (!estimatePd && i.time_stats?.time_estimate) {
+    estimatePd = Math.round(i.time_stats.time_estimate / 28800);
+  }
+
+  // ── STATUS: check issue labels (status lives on issues) ──
+  const STATUS_SCOPES = ['Status', 'status', 'Workflow', 'workflow'];
+  let statusVal = '';
+  for (const lbl of labels) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0 && STATUS_SCOPES.includes(lbl.slice(0, idx).trim())) {
+      statusVal = lbl.slice(idx + 2).trim().toLowerCase();
+      break;
+    }
+  }
+  const isBlocked  = statusVal.includes('block') || labels.some(l => l.toLowerCase() === 'blocked');
+  const inReview   = statusVal.includes('review');
+  const inProgress = statusVal.includes('progress') || statusVal.includes('doing') || statusVal.includes('wip');
+  const isDone     = statusVal.includes('done') || statusVal.includes('complete') || i.state === 'closed';
+
+  const mrCount = i._mrCount || i.merge_requests_count || 0;
+
+  // ── VM15 REMEDIATION — issues titled "[VM15] ..." ──
+  // Parses the "VM15 Findings" (component list) and severity sections out of the
+  // free-text issue description, and figures out per-component done-ness from
+  // either the overall issue state or a "<component>-done" label.
+  const isVM15 = /\[vm15\]/i.test(i.title || '');
+  let vm15 = null;
+  if (isVM15) {
+    const parsed = parseVM15Description(i.description);
+    const componentStatus = parsed.components.map(c => ({
+      name: c,
+      done: i.state === 'closed' || hasComponentDoneLabel(labels, c),
+    }));
+    vm15 = {
+      components: parsed.components,
+      severities: parsed.severities,
+      componentStatus,
+      allComponentsDone: componentStatus.length > 0 && componentStatus.every(c => c.done),
+    };
+  }
+
+  return { ...i, labels, epicLabels, scopedMap, plainLabels, estimatePd, isBlocked, inReview, inProgress, isDone, mrCount, vm15 };
+}
+
+// Parse the "VM15 Findings" component bullet list and Critical/Major/Moderate
+// severity bullet lists out of a GitLab issue's Markdown description.
+function parseVM15Description(desc) {
+  const lines = String(desc || '').split(/\r?\n/);
+  const components = [];
+  const severities = { critical: [], major: [], moderate: [] };
+  let mode = null;
+  const headingRe = /^\s{0,3}#{1,6}\s*(.+?)\s*$/;
+  for (const line of lines) {
+    const h = line.match(headingRe);
+    if (h) {
+      const heading = h[1].toLowerCase().trim();
+      if (heading.includes('vm15 findings'))    mode = 'components';
+      else if (/^critical\**$/.test(heading))   mode = 'critical';
+      else if (/^major\**$/.test(heading))      mode = 'major';
+      else if (/^moderate\**$/.test(heading))   mode = 'moderate';
+      else mode = null;
+      continue;
+    }
+    const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+    if (bullet && mode) {
+      const val = bullet[1].trim();
+      if (/^none$/i.test(val)) continue;
+      if (mode === 'components') components.push(val);
+      else severities[mode].push(val);
+    }
+  }
+  return { components: [...new Set(components)], severities };
+}
+
+// A component counts as "done" if the issue carries a "<component>-done" label
+// (case/spacing-insensitive), independent of whether other components on the
+// same issue are done, or of the overall issue state.
+function hasComponentDoneLabel(labelList, component) {
+  const target = component.toLowerCase().replace(/[\s_]+/g, '-') + '-done';
+  return (labelList || []).some(l => l.toLowerCase().replace(/[\s_]+/g, '-') === target);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// BUILD APP
+// ═══════════════════════════════════════════════════════════════════════
+function buildApp() {
+  document.getElementById('tb-group').textContent = S.groupPath;
+  const rb = document.getElementById('tb-role');
+  rb.textContent = ROLE_LABELS[S.role];
+  rb.style.background = ROLE_COLORS[S.role] + '22';
+  rb.style.color = ROLE_COLORS[S.role];
+  buildSidebar();
+  buildTabs();
+  renderSavedFilters();
+  renderAll();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SIDEBAR — fully derived from actual issue labels, no group API
+// ═══════════════════════════════════════════════════════════════════════
+
+// Scopes hidden from filter sidebar by default (too noisy / not useful for filtering)
+const DEFAULT_HIDDEN_SCOPES = new Set(['rank','team','squad','weight','sprint','pi']);
+
+
+function buildSidebar() {
+  // ── Decide label source based on active tab ──
+  // overview / milestones / risks / labels → epic-level labels only
+  // issues / assignees → issue-level labels only
+  const EPIC_TABS  = new Set(['overview','milestones','risks','labels','assignees']);
+  const ISSUE_TABS = new Set(['issues']);
+  const useEpicLabels  = EPIC_TABS.has(S.activeTab);
+  const useIssueLabels = ISSUE_TABS.has(S.activeTab);
+
+  // ── 1. Collect label usage ──
+  const usage = new Map();
+  if (useEpicLabels) {
+    // Only epic labels — one count per epic
+    S.allEpics.forEach(({epic}) => {
+      (epic._labels||[]).forEach(l => usage.set(l, (usage.get(l)||0)+1));
+    });
+  } else {
+    // Only issue labels
+    S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
+  }
+
+  // ── 2. Bucket by scope ──
+  const scopeMap = new Map();
+  const plainLabels = [];
+  for (const [lbl, cnt] of usage.entries()) {
+    const idx = lbl.indexOf('::');
+    if (idx > 0) {
+      const scopeRaw = lbl.slice(0, idx).trim();
+      const scopeKey = scopeRaw.toLowerCase();
+      const val      = lbl.slice(idx + 2).trim();
+      if (!scopeMap.has(scopeKey)) scopeMap.set(scopeKey, { displayScope: scopeRaw, labels: [] });
+      scopeMap.get(scopeKey).labels.push({ lbl, val, cnt });
+    } else {
+      plainLabels.push({ lbl, cnt });
+    }
+  }
+  scopeMap.forEach(({labels}) => labels.sort((a,b) => b.cnt - a.cnt));
+
+  // ── 3. Sort scopes: quarter scope first, then known order, then alpha ──
+  const qScope = null; // no quarter scope — all epic label scopes treated equally
+  const PRIORITY_ORDER = ['committed','increment','status','priority','type','component','area','estimate'];
+  const allScopeKeys = [...scopeMap.keys()].sort((a, b) => {
+    const av = a === qScope ? -2 : (PRIORITY_ORDER.indexOf(a) >= 0 ? PRIORITY_ORDER.indexOf(a) : 999);
+    const bv = b === qScope ? -2 : (PRIORITY_ORDER.indexOf(b) >= 0 ? PRIORITY_ORDER.indexOf(b) : 999);
+    return av !== bv ? av - bv : a.localeCompare(b);
+  });
+
+  // ── 4. Render ──
+  const scroll = document.querySelector('.sidebar-scroll');
+  scroll.querySelectorAll('.filter-section-dynamic').forEach(el => el.remove());
+  const assigneesSection = document.getElementById('fs-assignees');
+
+  // Context label showing which source is active
+  const ctxNote = document.createElement('div');
+  ctxNote.className = 'filter-section-dynamic';
+  ctxNote.style.cssText = 'font-size:10px;color:var(--muted);padding:4px 4px 8px;letter-spacing:0.05em;text-transform:uppercase';
+  ctxNote.textContent = useEpicLabels ? '⬡ Epic filters' : '◈ Issue filters';
+  scroll.insertBefore(ctxNote, assigneesSection);
+
+  allScopeKeys.forEach(scopeKey => {
+    const { displayScope, labels } = scopeMap.get(scopeKey);
+    const isHidden = S.hiddenScopes.has(scopeKey);
+    const sec = document.createElement('div');
+    sec.className = 'filter-section filter-section-dynamic';
+    sec.dataset.scope = scopeKey;
+
+    const eyeIcon = isHidden ? '👁‍🗨' : '👁';
+    sec.innerHTML = `
+      <div class="filter-section-title">
+        ${esc(displayScope)}
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="filter-section-count">${labels.length}</span>
+          <span style="cursor:pointer;font-size:10px;opacity:0.6;user-select:none"
+            title="${isHidden?'Show':'Hide'} this scope"
+            onclick="toggleScopeVisibility('${scopeKey.replace(/'/g,"\\'")}',this)">${eyeIcon}</span>
+        </span>
+      </div>` +
+      (isHidden
+        ? `<div style="font-size:10px;color:var(--muted);padding:2px 4px 6px">Hidden — click 👁‍🗨 to show</div>`
+        : `<div id="fscope-${scopeKey}">${labels.map(e => filterChipHTML(e.lbl, e.val, e.cnt, S.labelColorCache.get(e.lbl)||autoColor(e.lbl))).join('')}</div>`
+      );
+    scroll.insertBefore(sec, assigneesSection);
+  });
+
+  // Plain labels
+  if (plainLabels.length) {
+    plainLabels.sort((a,b) => b.cnt - a.cnt);
+    const isHidden = S.hiddenScopes.has('__plain__');
+    const sec = document.createElement('div');
+    sec.className = 'filter-section filter-section-dynamic';
+    sec.dataset.scope = '__plain__';
+    sec.innerHTML = `
+      <div class="filter-section-title">
+        Labels
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="filter-section-count">${plainLabels.length}</span>
+          <span style="cursor:pointer;font-size:10px;opacity:0.6;user-select:none"
+            onclick="toggleScopeVisibility('__plain__',this)">${isHidden?'👁‍🗨':'👁'}</span>
+        </span>
+      </div>` +
+      (isHidden
+        ? `<div style="font-size:10px;color:var(--muted);padding:2px 4px 6px">Hidden — click 👁‍🗨 to show</div>`
+        : `<div>${plainLabels.slice(0,50).map(e => filterChipHTML(e.lbl, e.lbl, e.cnt, S.labelColorCache.get(e.lbl)||autoColor(e.lbl))).join('')}</div>`
+      );
+    scroll.insertBefore(sec, assigneesSection);
+  }
+
+  // ── 5. Assignees (always from issues regardless of tab) ──
+  const aMap = new Map();
+  S.allIssues.forEach(i => (i.assignees||[]).forEach(a => {
+    if (!aMap.has(a.id)) aMap.set(a.id, {a, cnt:0});
+    aMap.get(a.id).cnt++;
+  }));
+  const aEntries = [...aMap.values()].sort((x,y) => y.cnt - x.cnt);
+  document.getElementById('fs-assignees-count').textContent = aEntries.length;
+  document.getElementById('filter-assignees').innerHTML = aEntries.map(({a,cnt}) => `
+    <div class="filter-chip" data-assignee="${a.id}" onclick="toggleAssignee(this)">
+      ${a.avatar_url ? `<img class="avatar-sm" src="${a.avatar_url}" alt="">` : `<div class="avatar-placeholder">${(a.name||'?')[0]}</div>`}
+      <span class="chip-label">${esc(a.name || a.username)}</span>
+      <span class="chip-count">${cnt}</span>
+    </div>`).join('');
+}
+
+function toggleScopeVisibility(scopeKey, btn) {
+  if (S.hiddenScopes.has(scopeKey)) {
+    S.hiddenScopes.delete(scopeKey);
+    btn.textContent = '👁';
+    btn.title = 'Hide this scope';
+    const container = btn.closest('.filter-section');
+    // Re-render the labels for this scope
+    const existing = container.querySelector('[id^="fscope-"]') || container.querySelector('div:last-child');
+    if (existing) existing.remove();
+    const hidden = container.querySelector('div[style*="Hidden"]');
+    if (hidden) hidden.remove();
+    const usage = new Map();
+    S.allIssues.forEach(i => i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1)));
+    const entries = [];
+    for (const [lbl, cnt] of usage.entries()) {
+      const idx = lbl.indexOf('::');
+      if (idx > 0 && lbl.slice(0, idx).trim().toLowerCase() === scopeKey)
+        entries.push({ lbl, val: lbl.slice(idx+2).trim(), cnt });
+      else if (scopeKey === '__plain__' && idx < 0)
+        entries.push({ lbl, val: lbl, cnt });
+    }
+    entries.sort((a,b) => b.cnt - a.cnt);
+    const div = document.createElement('div');
+    div.id = `fscope-${scopeKey}`;
+    div.innerHTML = entries.map(e => filterChipHTML(e.lbl, e.val, e.cnt, S.labelColorCache.get(e.lbl)||autoColor(e.lbl))).join('');
+    container.appendChild(div);
+  } else {
+    S.hiddenScopes.add(scopeKey);
+    btn.textContent = '👁‍🗨';
+    btn.title = 'Show this scope';
+    const container = btn.closest('.filter-section');
+    const labelsDiv = container.querySelector(`#fscope-${scopeKey}`) || container.querySelector('div:last-child');
+    if (labelsDiv) labelsDiv.remove();
+    const hint = document.createElement('div');
+    hint.style.cssText = 'font-size:10px;color:var(--muted);padding:2px 4px 6px';
+    hint.textContent = 'Hidden — click 👁‍🗨 to show';
+    container.appendChild(hint);
+  }
+  saveConfig();
+}
+
+function filterChipHTML(lbl, displayName, cnt, color) {
+  const dot = `<span class="chip-dot" style="background:${color||'#6B7280'}"></span>`;
+  return `<div class="filter-chip" data-label="${lbl.replace(/"/g,'&quot;')}" onclick="toggleLabel(this)">
+    ${dot}<span class="chip-mode"></span><span class="chip-label">${esc(displayName)}</span><span class="chip-count">${cnt}</span>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FILTERS
+// ═══════════════════════════════════════════════════════════════════════
+function toggleLabel(el) {
+  const lbl = el.dataset.label;
+  const isEpicCtx = ['overview','milestones','risks','labels','assignees'].includes(S.activeTab);
+  const incSet = isEpicCtx ? S.activeEpicLabels  : S.activeIssueLabels;
+  const excSet = isEpicCtx ? S.excludeEpicLabels : S.excludeIssueLabels;
+  const modeEl = el.querySelector('.chip-mode');
+
+  if (!incSet.has(lbl) && !excSet.has(lbl)) {
+    // off → include
+    incSet.add(lbl);
+    el.classList.add('active');
+    el.classList.remove('exclude');
+    if (modeEl) modeEl.textContent = '+';
+  } else if (incSet.has(lbl)) {
+    // include → exclude
+    incSet.delete(lbl);
+    excSet.add(lbl);
+    el.classList.remove('active');
+    el.classList.add('exclude');
+    if (modeEl) modeEl.textContent = '−';
+  } else {
+    // exclude → off
+    excSet.delete(lbl);
+    el.classList.remove('active','exclude');
+    if (modeEl) modeEl.textContent = '';
+  }
+  updateClearBtn();
+  applyFilters();
+}
+function toggleAssignee(el) {
+  const id = parseInt(el.dataset.assignee);
+  S.activeAssignees.has(id) ? S.activeAssignees.delete(id) : S.activeAssignees.add(id);
+  el.classList.toggle('active');
+  updateClearBtn();
+  applyFilters();
+}
+function clearFilters() {
+  S.activeEpicLabels.clear();
+  S.activeIssueLabels.clear();
+  S.excludeEpicLabels.clear();
+  S.excludeIssueLabels.clear();
+  S.activeAssignees.clear();
+  document.getElementById('search-box').value = '';
+  document.querySelectorAll('.filter-chip.active, .filter-chip.exclude').forEach(c => {
+    c.classList.remove('active','exclude');
+    const m = c.querySelector('.chip-mode');
+    if (m) m.textContent = '';
+  });
+  updateClearBtn();
+  applyFilters();
+}
+function updateClearBtn() {
+  const has = S.activeEpicLabels.size > 0 || S.activeIssueLabels.size > 0 ||
+              S.excludeEpicLabels.size > 0 || S.excludeIssueLabels.size > 0 ||
+              S.activeAssignees.size > 0 || document.getElementById('search-box').value;
+  document.getElementById('clear-btn').style.display = has ? '' : 'none';
+}
+
+function applyFilters() {
+  updateClearBtn();
+  const term        = document.getElementById('search-box').value.toLowerCase();
+  const incEpic     = [...S.activeEpicLabels];
+  const excEpic     = [...S.excludeEpicLabels];
+  const incIssue    = [...S.activeIssueLabels];
+  const excIssue    = [...S.excludeIssueLabels];
+
+  // 1. Filter epics: must have ALL include labels, must have NONE of exclude labels
+  S.filteredEpics = S.allEpics.filter(({epic}) => {
+    const epLabels = epic._labels || [];
+    if (incEpic.length && !incEpic.every(l => epLabels.includes(l))) return false;
+    if (excEpic.length &&  excEpic.some(l  => epLabels.includes(l))) return false;
+    return true;
+  });
+
+  // 2. Issue pool = issues belonging to filtered epics
+  const filteredEpicIssueIds = new Set(S.filteredEpics.flatMap(({issues}) => issues.map(i => i.id)));
+
+  // 3. Filter issues: must pass epic pool + include + exclude + assignees + search
+  S.filteredIssues = S.allIssues.filter(i => {
+    if (!filteredEpicIssueIds.has(i.id)) return false;
+    if (term && !i.title.toLowerCase().includes(term) && !String(i.iid).includes(term)) return false;
+    if (incIssue.length && !incIssue.every(l => i.labels.includes(l))) return false;
+    if (excIssue.length &&  excIssue.some(l  => i.labels.includes(l))) return false;
+    if (S.activeAssignees.size > 0) {
+      const ids = new Set((i.assignees||[]).map(a => a.id));
+      if (![...S.activeAssignees].some(id => ids.has(id))) return false;
+    }
+    return true;
+  });
+
+  // 4. Re-derive milestones from filtered issues
+  S.milestones = deriveMilestonesFromIssues(S.filteredIssues);
+
+  renderAll();
+}
+
+// ── Saved Filters ──
+function getSavedFilters() {
+  try { return JSON.parse(localStorage.getItem('epicdash_saved_filters') || '[]'); }
+  catch(e) { return []; }
+}
+function putSavedFilters(arr) {
+  try { localStorage.setItem('epicdash_saved_filters', JSON.stringify(arr)); } catch(e) {}
+}
+
+function saveCurrentFilters() {
+  const hasAny = S.activeEpicLabels.size || S.excludeEpicLabels.size ||
+                 S.activeIssueLabels.size || S.excludeIssueLabels.size || S.activeAssignees.size;
+  if (!hasAny) { alert('No active filters to save.'); return; }
+
+  const saved = getSavedFilters();
+  const defaultName = 'Filter ' + (saved.length + 1);
+  const name = prompt('Name this filter config:', defaultName);
+  if (!name) return;
+
+  saved.push({
+    name: name.trim() || defaultName,
+    incEpic:  [...S.activeEpicLabels],
+    excEpic:  [...S.excludeEpicLabels],
+    incIssue: [...S.activeIssueLabels],
+    excIssue: [...S.excludeIssueLabels],
+    assignees: [...S.activeAssignees],
+  });
+  putSavedFilters(saved);
+  renderSavedFilters();
+}
+
+function applySavedFilter(idx) {
+  const saved = getSavedFilters();
+  const f = saved[idx];
+  if (!f) return;
+
+  // Clear current filters without triggering applyFilters yet
+  S.activeEpicLabels.clear();
+  S.activeIssueLabels.clear();
+  S.excludeEpicLabels.clear();
+  S.excludeIssueLabels.clear();
+  S.activeAssignees.clear();
+  document.getElementById('search-box').value = '';
+
+  // Restore saved state into S
+  (f.incEpic  ||[]).forEach(l => S.activeEpicLabels.add(l));
+  (f.excEpic  ||[]).forEach(l => S.excludeEpicLabels.add(l));
+  (f.incIssue ||[]).forEach(l => S.activeIssueLabels.add(l));
+  (f.excIssue ||[]).forEach(l => S.excludeIssueLabels.add(l));
+  (f.assignees||[]).forEach(id => S.activeAssignees.add(id));
+
+  // Temporarily un-hide any scopes that contain active labels so chips are in the DOM
+  const allActiveLabels = [
+    ...S.activeEpicLabels, ...S.excludeEpicLabels,
+    ...S.activeIssueLabels, ...S.excludeIssueLabels,
+  ];
+  allActiveLabels.forEach(lbl => {
+    const idx = lbl.indexOf('::');
+    const scopeKey = idx > 0 ? lbl.slice(0, idx).trim().toLowerCase() : '__plain__';
+    S.hiddenScopes.delete(scopeKey); // un-hide so chip appears in DOM
+  });
+
+  // Rebuild sidebar (now all relevant scopes are visible)
+  buildSidebar();
+
+  // Reflect state onto chips
+  document.querySelectorAll('.filter-chip[data-label]').forEach(el => {
+    const lbl = el.dataset.label;
+    const modeEl = el.querySelector('.chip-mode');
+    el.classList.remove('active', 'exclude');
+    if (modeEl) modeEl.textContent = '';
+
+    const isEpicCtx = ['overview','milestones','risks','labels','assignees'].includes(S.activeTab);
+    if (isEpicCtx) {
+      if (S.activeEpicLabels.has(lbl))  { el.classList.add('active');  if(modeEl) modeEl.textContent='+'; }
+      if (S.excludeEpicLabels.has(lbl)) { el.classList.add('exclude'); if(modeEl) modeEl.textContent='−'; }
+    } else {
+      if (S.activeIssueLabels.has(lbl))  { el.classList.add('active');  if(modeEl) modeEl.textContent='+'; }
+      if (S.excludeIssueLabels.has(lbl)) { el.classList.add('exclude'); if(modeEl) modeEl.textContent='−'; }
+    }
+  });
+  document.querySelectorAll('.filter-chip[data-assignee]').forEach(el => {
+    el.classList.toggle('active', S.activeAssignees.has(parseInt(el.dataset.assignee)));
+  });
+
+  updateClearBtn();
+  applyFilters();
+}
+
+function deleteSavedFilter(idx) {
+  const saved = getSavedFilters();
+  saved.splice(idx, 1);
+  putSavedFilters(saved);
+  renderSavedFilters();
+}
+
+function renderSavedFilters() {
+  const saved = getSavedFilters();
+  const list = document.getElementById('saved-filters-list');
+  if (!list) return;
+  if (!saved.length) {
+    list.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:2px 4px 6px">No saved filters yet</div>';
+    return;
+  }
+  list.innerHTML = saved.map((f, i) => {
+    const parts = [];
+    if (f.incEpic?.length)  parts.push('+' + f.incEpic.map(l=>l.split('::').pop()).join(', '));
+    if (f.excEpic?.length)  parts.push('−' + f.excEpic.map(l=>l.split('::').pop()).join(', '));
+    if (f.incIssue?.length) parts.push('+' + f.incIssue.map(l=>l.split('::').pop()).join(', '));
+    if (f.excIssue?.length) parts.push('−' + f.excIssue.map(l=>l.split('::').pop()).join(', '));
+    const preview = parts.join(' · ') || 'empty';
+    return `<div class="saved-filter-row" title="${esc(preview)}">
+      <span class="saved-filter-name">${esc(f.name)}</span>
+      <button class="saved-filter-btn saved-filter-apply" onclick="applySavedFilter(${i})">Apply</button>
+      <button class="saved-filter-btn saved-filter-del"   onclick="deleteSavedFilter(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+// ═══════════════════════════════════════════════════════════════════════
+const TAB_DEFS = {
+  PO:  ['overview','issues','milestones','labels','risks','vm15'],
+  SM:  ['overview','issues','assignees','milestones','risks','vm15'],
+  DEV: ['issues','assignees','milestones','overview','vm15'],
+  QA:  ['issues','milestones','labels','risks','vm15'],
+};
+const TAB_META = {
+  overview:   { label:'Overview',          icon:'📊' },
+  issues:     { label:'Issues',           icon:'📋' },
+  assignees:  { label:'Team Load',        icon:'👥' },
+  labels:     { label:'Label Analysis',   icon:'🏷' },
+  risks:      { label:'Risks & Blockers', icon:'⚠️' },
+  milestones: { label:'Milestones',       icon:'🎯' },
+  vm15:       { label:'VM15 Remediation', icon:'🛡' },
+};
+
+function buildTabs() {
+  const tabs = TAB_DEFS[S.role] || ['overview','issues'];
+  S.activeTab = tabs[0];
+  document.getElementById('tab-bar').innerHTML = tabs.map(t => `
+    <div class="tab-item ${t===S.activeTab?'active':''}" data-tab="${t}" onclick="switchTab('${t}')">
+      ${TAB_META[t].icon} ${TAB_META[t].label}
+      <span class="tab-badge" id="tab-badge-${t}"></span>
+    </div>`).join('');
+
+  // Show panels
+  tabs.forEach(t => { document.getElementById(`panel-${t}`).style.display = 'none'; });
+  document.getElementById(`panel-${S.activeTab}`).style.display = 'block';
+  document.getElementById(`panel-${S.activeTab}`).classList.add('active');
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(el => { el.style.display='none'; el.classList.remove('active'); });
+  document.getElementById(`panel-${tab}`).style.display = 'block';
+  document.getElementById(`panel-${tab}`).classList.add('active');
+  S.activeTab = tab;
+  // Sidebar filters depend on active tab context (epic labels vs issue labels)
+  buildSidebar();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════════════════════
+function renderAll() {
+  const tabs = TAB_DEFS[S.role] || [];
+  if (tabs.includes('overview'))    renderOverview();
+  if (tabs.includes('issues'))      renderIssues();
+  if (tabs.includes('assignees'))   renderAssignees();
+  if (tabs.includes('labels'))      renderLabels();
+  if (tabs.includes('risks'))       renderRisks();
+  if (tabs.includes('milestones'))  renderMilestones();
+  if (tabs.includes('vm15'))        renderVM15();
+  updateTabBadges();
+}
+
+function updateTabBadges() {
+  const fi = S.filteredIssues;
+  const fe = S.filteredEpics;
+  const setBadge = (id, val) => { const el = document.getElementById(`tab-badge-${id}`); if(el) el.textContent = val||''; };
+  setBadge('overview',   fe.length);
+  setBadge('issues',     fi.length);
+  setBadge('risks',      fi.filter(i=>i.isBlocked).length || '');
+  setBadge('milestones', S.milestones.length || '');
+  const assigneeCount = new Set(fi.flatMap(i=>(i.assignees||[]).map(a=>a.id))).size;
+  setBadge('assignees',  assigneeCount || '');
+  const vm15Open = fi.filter(i=>i.vm15 && i.state!=='closed').length;
+  setBadge('vm15', vm15Open || '');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// OVERVIEW TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderOverview() {
+  const fi = S.filteredIssues;
+  const fe = S.filteredEpics;
+  const total   = fi.length;
+  const closed  = fi.filter(i=>i.state==='closed').length;
+  const open    = total - closed;
+  const blocked = fi.filter(i=>i.isBlocked).length;
+  const noAss   = fi.filter(i=>!(i.assignees||[]).length).length;
+
+  // Estimates live on epics — sum epic estimates across filtered epics
+  // An epic counts as "estimated" if it has an Estimate:: label
+  const totalPd  = fe.reduce((s,{epic}) => s + getEpicEstimatePd(epic), 0);
+  const noEst    = fe.filter(({epic}) => !getEpicEstimatePd(epic)).length;
+  // "Done pd" = sum of estimates for epics that are fully closed (all filtered issues closed)
+  const donePd   = fe.reduce((s,{epic, issues}) => {
+    const epFiltered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
+    const allClosed  = epFiltered.length > 0 && epFiltered.every(i=>i.state==='closed');
+    return s + (allClosed ? getEpicEstimatePd(epic) : 0);
+  }, 0);
+
+  const pct     = total ? Math.round(closed/total*100) : 0;
+  const color   = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--red)';
+  const qLabel  = S.activeEpicLabels.size ? [...S.activeEpicLabels].join(' & ') : 'All Epics';
+
+  let kpisHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+      ${kpiCard('Epics', fe.length, '', 'var(--accent)', qLabel)}
+      ${kpiCard('Issues', total, '', 'var(--blue)', fe.length + ' epics')}
+      ${kpiCard('Closed', closed, '', 'var(--green)', pct+'% complete')}
+      ${kpiCard('Open', open, '', open>0?'var(--blue)':'var(--green)', fi.filter(i=>i.inProgress).length+' in progress')}
+      ${kpiCard('Blocked', blocked, '⚠', blocked>0?'var(--red)':'var(--muted)', blocked>0?'needs attention':'all clear')}
+      ${kpiCard('Est. Total', totalPd?totalPd+'pd':'—', '', 'var(--blue)', donePd?donePd+'pd done':'none closed yet')}
+      ${kpiCard('No Estimate', noEst, '!', noEst>0?'var(--yellow)':'var(--muted)', 'missing estimate')}
+    </div>`;
+
+  kpisHTML += `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:600">${esc(qLabel)} Progress</div>
+        <div style="font-family:var(--mono);font-size:13px;color:${color}">${pct}%</div>
+      </div>
+      <div class="prog-bar" style="height:8px">
+        <div class="prog-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px">
+        <span>${closed} closed</span><span>${open} remaining</span>
+      </div>
+    </div>`;
+
+  // ── Sort epics by Rank:: label on the epic itself ──
+  // Epic labels come from epic.labels (array of strings on epic object)
+  function getEpicRank(ep) {
+    const epicLabels = Array.isArray(ep.labels) ? ep.labels.map(l => typeof l==='string'?l:l.name) : [];
+    for (const lbl of epicLabels) {
+      const m = lbl.match(/^Rank::(\d+)$/i);
+      if (m) return parseInt(m[1]);
+    }
+    return 9999;
+  }
+
+  const sortedEpics = [...S.filteredEpics].sort((a, b) => getEpicRank(a.epic) - getEpicRank(b.epic));
+
+  kpisHTML += `<div style="font-size:13px;font-weight:600;margin-bottom:12px">Epics (${sortedEpics.length})</div>
+    <div class="epic-grid">`;
+
+  sortedEpics.forEach(({epic, issues}) => {
+    // Only show issues that pass the current issue-level filters too
+    const filtered      = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
+    const isEmpty       = filtered.length === 0;
+    const hasAnyIssues  = issues.length > 0;
+
+    const epicClosed  = filtered.filter(i=>i.state==='closed').length;
+    const epicPct     = filtered.length ? Math.round(epicClosed/filtered.length*100) : 0;
+    const epicPd      = getEpicEstimatePd(epic);  // estimate lives on the epic, not on individual issues
+    const epicBlocked = filtered.filter(i=>i.isBlocked).length;
+    const epicPcol    = epicPct>=75?'var(--green)':epicPct>=40?'var(--yellow)':'var(--accent)';
+
+    // Rank label
+    const epicLabels = Array.isArray(epic.labels) ? epic.labels.map(l=>typeof l==='string'?l:l.name) : [];
+    const rankLabel  = epicLabels.find(l=>/^Rank::/i.test(l));
+    const rankNum    = rankLabel ? rankLabel.replace(/^Rank::/i,'') : null;
+
+    // ── Empty epic: red border warning ──
+    const borderStyle = !hasAnyIssues
+      ? 'border-color:#EF444466;background:rgba(239,68,68,0.04)'
+      : '';
+
+    const emptyBanner = !hasAnyIssues
+      ? `<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,0.1);border-radius:6px;padding:4px 8px;margin-bottom:10px">⚠ No issues linked to this epic</div>`
+      : '';
+
+    const statusVals = [...new Set(filtered.flatMap(i=>i.scopedMap['Status']||[]))].slice(0,3);
+
+    kpisHTML += `
+      <div class="epic-card" style="${borderStyle}">
+        <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px">
+          ${rankNum ? `<span style="font-family:var(--mono);font-size:10px;background:rgba(252,109,38,0.15);color:var(--accent);padding:2px 7px;border-radius:10px;flex-shrink:0;margin-top:2px">#${rankNum}</span>` : ''}
+          <a href="${epic.web_url}" target="_blank" class="epic-title" style="margin-bottom:0">${esc(epic.title)}</a>
+        </div>
+        <div class="epic-meta">#${epic.iid} · ${filtered.length} issues</div>
+        ${emptyBanner}
+        ${!isEmpty ? `
+        <div class="epic-stats">
+          <span class="epic-stat" style="color:var(--green)">✓ ${epicClosed} closed</span>
+          <span class="epic-stat" style="color:var(--blue)">◷ ${filtered.length - epicClosed} open</span>
+          ${epicBlocked ? `<span class="epic-stat" style="color:var(--red)">⚠ ${epicBlocked} blocked</span>` : ''}
+          ${epicPd ? `<span class="epic-stat" style="color:var(--muted)">${epicPd}pd</span>` : ''}
+        </div>
+        <div class="prog-bar">
+          <div class="prog-fill" style="width:${epicPct}%;background:${epicPcol}"></div>
+        </div>
+        <div style="font-size:10px;color:${epicPcol};text-align:right;margin-top:4px;font-family:var(--mono)">${epicPct}%</div>
+        ${statusVals.length ? `<div class="epic-labels">${statusVals.map(v=>`<span class="label-chip" style="background:#374151">${esc(v)}</span>`).join('')}</div>` : ''}
+        ` : ''}
+      </div>`;
+  });
+  kpisHTML += '</div>';
+
+  document.getElementById('panel-overview').innerHTML = kpisHTML;
+}
+
+function kpiCard(label, value, icon, color, sub) {
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value" style="color:${color}">${icon?icon+' ':''}${value}</div>
+    <div class="kpi-sub">${sub}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ISSUES TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderIssues() {
+  function getEpicRank(ep) {
+    const epicLabels = Array.isArray(ep.labels) ? ep.labels.map(l=>typeof l==='string'?l:l.name) : [];
+    for (const lbl of epicLabels) { const m=lbl.match(/^Rank::(\d+)$/i); if(m) return parseInt(m[1]); }
+    return 9999;
+  }
+  const sortedEpics = [...S.filteredEpics].sort((a,b) => getEpicRank(a.epic) - getEpicRank(b.epic));
+
+  let html = '';
+  sortedEpics.forEach(({epic, issues}) => {
+    const filtered = issues.filter(i => S.filteredIssues.some(f=>f.id===i.id));
+    if (!filtered.length) return;
+
+    const closed  = filtered.filter(i=>i.state==='closed').length;
+    const blocked = filtered.filter(i=>i.isBlocked).length;
+    const totalPd = getEpicEstimatePd(epic);  // estimate is on the epic
+
+    const epicLabels = Array.isArray(epic.labels) ? epic.labels.map(l=>typeof l==='string'?l:l.name) : [];
+    const rankLabel  = epicLabels.find(l=>/^Rank::/i.test(l));
+    const rankNum    = rankLabel ? rankLabel.replace(/^Rank::/i,'') : null;
+    const rankBadge  = rankNum ? `<span style="font-family:var(--mono);font-size:10px;background:rgba(252,109,38,0.15);color:var(--accent);padding:1px 6px;border-radius:8px">#${rankNum}</span>` : '';
+
+    html += `
+      <div class="issue-group" id="ig-${epic.iid}">
+        <div class="issue-group-header" onclick="toggleGroup('ig-${epic.iid}')">
+          <span class="collapse-icon">▾</span>
+          ${rankBadge}
+          <span class="issue-group-title">${esc(epic.title)}</span>
+          <span class="issue-group-meta">${closed}/${filtered.length} closed${blocked?` · ⚠${blocked} blocked`:''}${totalPd?` · ${totalPd}pd`:''}</span>
+          <a href="${epic.web_url}" target="_blank" style="font-size:11px;color:var(--muted);text-decoration:none;margin-left:8px" onclick="event.stopPropagation()">↗</a>
+        </div>
+        <div class="issue-list">`;
+
+    filtered.forEach(i => {
+      const assigneeImgs = (i.assignees||[]).slice(0,3).map(a =>
+        a.avatar_url
+          ? `<img src="${a.avatar_url}" title="${esc(a.name||a.username)}" style="width:18px;height:18px;border-radius:50%;border:1px solid var(--bg);margin-left:-4px">`
+          : `<div style="width:18px;height:18px;border-radius:50%;background:var(--surface2);display:inline-flex;align-items:center;justify-content:center;font-size:8px;margin-left:-4px;">${(a.name||'?')[0]}</div>`
+      ).join('');
+
+      let statusBadge = '';
+      if (i.isBlocked)             statusBadge = '<span class="badge badge-blocked">Blocked</span>';
+      else if (i.inReview)         statusBadge = '<span class="badge badge-review">Review</span>';
+      else if (i.state==='closed') statusBadge = '<span class="badge badge-done">Done</span>';
+      else if (i.inProgress)       statusBadge = '<span class="badge badge-inprogress">In Progress</span>';
+
+      const typeVal     = (i.scopedMap['Type']||[])[0] || '';
+      const priorityVal = (i.scopedMap['Priority']||[])[0] || '';
+      const labelChips  = [];
+      if (typeVal) labelChips.push(`<span class="badge" style="background:rgba(20,184,166,0.12);color:var(--teal);border:1px solid rgba(20,184,166,0.25)">${esc(typeVal)}</span>`);
+      if (priorityVal) {
+        const pc = priorityVal.toLowerCase().includes('high')?'var(--red)':priorityVal.toLowerCase().includes('med')?'var(--yellow)':'var(--muted)';
+        labelChips.push(`<span class="badge" style="background:rgba(0,0,0,0.2);color:${pc};border:1px solid ${pc}44">${esc(priorityVal)}</span>`);
+      }
+
+      html += `
+        <a href="${i.web_url}" target="_blank" class="issue-row">
+          <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+          <div class="issue-id">#${i.iid}</div>
+          <div class="issue-title-cell">${esc(i.title)}</div>
+          <div class="issue-chips">
+            ${statusBadge}
+            ${labelChips.join('')}
+            ${i.mrCount ? `<span class="badge badge-mr">MR ×${i.mrCount}</span>` : ''}
+            ${i.estimatePd ? `<span class="est-label">${i.estimatePd}pd</span>` : ''}
+            <div style="display:flex;margin-left:4px">${assigneeImgs}</div>
+          </div>
+        </a>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  document.getElementById('panel-issues').innerHTML = html || `<div class="empty"><div class="empty-icon">🔍</div><div class="empty-text">No issues match your filters</div></div>`;
+}
+
+function toggleGroup(id) {
+  document.getElementById(id).classList.toggle('collapsed');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ASSIGNEES TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderAssignees() {
+  const aMap = new Map();
+  S.filteredIssues.forEach(i => {
+    (i.assignees||[]).forEach(a => {
+      if (!aMap.has(a.id)) aMap.set(a.id, { user: a, issues: [], pd: 0 });
+      const entry = aMap.get(a.id);
+      entry.issues.push(i);
+      entry.pd += i.estimatePd || 0;
+    });
+  });
+
+  const maxPd = Math.max(...[...aMap.values()].map(e=>e.pd), 1);
+
+  // KPIs
+  const unassigned = S.filteredIssues.filter(i=>!(i.assignees||[]).length);
+  let html = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+      ${kpiCard('Team Members', aMap.size, '', 'var(--blue)', 'with issues')}
+      ${kpiCard('Unassigned', unassigned.length, unassigned.length?'!':'', unassigned.length?'var(--yellow)':'var(--green)', 'need owner')}
+    </div>`;
+
+  if (unassigned.length) {
+    html += `<div style="background:rgba(234,179,8,0.06);border:1px solid rgba(234,179,8,0.2);border-radius:14px;padding:16px;margin-bottom:24px">
+      <div style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:8px">⚠ Unassigned Issues</div>
+      ${unassigned.map(i=>`<a href="${i.web_url}" target="_blank" class="assignee-issue-row" style="display:flex;align-items:center;gap:6px;text-decoration:none;color:var(--text);font-size:12px;padding:4px 0;border-top:1px solid var(--border)">
+        <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+        <span style="font-family:var(--mono);font-size:11px;color:var(--muted)">#${i.iid}</span>
+        <span>${esc(i.title)}</span>
+      </a>`).join('')}
+    </div>`;
+  }
+
+  html += `<div class="assignee-grid">`;
+
+  [...aMap.values()].sort((a,b)=>b.pd-a.pd || b.issues.length-a.issues.length).forEach(({user, issues, pd}) => {
+    const open   = issues.filter(i=>i.state!=='closed').length;
+    const blocked= issues.filter(i=>i.isBlocked).length;
+    const pct    = maxPd ? Math.round(pd/maxPd*100) : 0;
+    const wcolor = pct>80?'var(--red)':pct>50?'var(--yellow)':'var(--green)';
+
+    html += `
+      <div class="assignee-card">
+        <div class="assignee-header">
+          ${user.avatar_url ? `<img class="assignee-avatar" src="${user.avatar_url}" alt="">` : `<div class="assignee-avatar" style="background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:16px">${(user.name||'?')[0]}</div>`}
+          <div>
+            <div class="assignee-name">${esc(user.name||user.username)}</div>
+            <div class="assignee-stats">${issues.length} issues · ${pd||'no'} pd</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);margin-bottom:8px">
+          <span style="color:var(--blue)">◷ ${open} open</span>
+          <span style="color:var(--green)">✓ ${issues.length-open} closed</span>
+          ${blocked?`<span style="color:var(--red)">⚠ ${blocked} blocked</span>`:''}
+        </div>
+        <div class="workload-bar"><div class="workload-fill" style="width:${pct}%;background:${wcolor}"></div></div>
+        <div style="font-size:10px;color:${wcolor};text-align:right;font-family:var(--mono)">${pd}pd workload</div>
+        <div class="assignee-issues">
+          ${issues.slice(0,8).map(i=>`<a href="${i.web_url}" target="_blank" class="assignee-issue-row">
+            <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+            <span style="font-family:var(--mono);font-size:10px;color:var(--muted)">#${i.iid}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${esc(i.title)}</span>
+            ${i.isBlocked?'<span style="color:var(--red);font-size:10px">⚠</span>':''}
+          </a>`).join('')}
+          ${issues.length>8?`<div style="font-size:11px;color:var(--muted);padding-top:4px;border-top:1px solid var(--border)">+${issues.length-8} more</div>`:''}
+        </div>
+      </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('panel-assignees').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// LABELS TAB
+// ═══════════════════════════════════════════════════════════════════════
+function getLabelHiddenGroups() {
+  try { return new Set(JSON.parse(localStorage.getItem('epicdash_hidden_label_groups') || '[]')); }
+  catch(e) { return new Set(); }
+}
+function saveLabelHiddenGroups(set) {
+  try { localStorage.setItem('epicdash_hidden_label_groups', JSON.stringify([...set])); } catch(e) {}
+}
+function toggleLabelGroup(group) {
+  const hidden = getLabelHiddenGroups();
+  hidden.has(group) ? hidden.delete(group) : hidden.add(group);
+  saveLabelHiddenGroups(hidden);
+  renderLabels();
+}
+
+function renderLabels() {
+  const colorMap = S.labelColorCache;
+  const hidden   = getLabelHiddenGroups();
+
+  // Collect usage from filtered issues + their epic labels
+  const usage = new Map();
+  S.filteredIssues.forEach(i => {
+    i.labels.forEach(l => usage.set(l, (usage.get(l)||0)+1));
+    // Also count epic labels so they appear in the analysis
+    (i.epicLabels||[]).forEach(l => usage.set(l, (usage.get(l)||0)+1));
+  });
+
+  // Group by scope
+  const groups = new Map();
+  usage.forEach((cnt, lbl) => {
+    const idx = lbl.indexOf('::');
+    const group = idx > 0 ? lbl.slice(0, idx) : '(plain)';
+    if (!groups.has(group)) groups.set(group, []);
+    groups.get(group).push({ lbl, val: idx>0 ? lbl.slice(idx+2) : lbl, cnt });
+  });
+
+  const sortedGroups = [...groups.entries()].sort((a,b) => a[0].localeCompare(b[0]));
+  const hiddenCount  = sortedGroups.filter(([g]) => hidden.has(g)).length;
+
+  let html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;font-weight:600">Label Distribution — ${S.filteredIssues.length} issues · ${sortedGroups.length} scopes</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${hiddenCount ? '<span style="font-size:11px;color:var(--muted)">' + hiddenCount + ' scope(s) hidden</span>' : ''}
+        <button onclick="(function(){var h=getLabelHiddenGroups();h.clear();saveLabelHiddenGroups(h);renderLabels();})()" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:var(--sans)">Show all</button>
+      </div>
+    </div>
+    <div class="label-analysis-grid">`;
+
+  sortedGroups.forEach(([group, entries]) => {
+    const isHidden = hidden.has(group);
+    const sorted   = entries.sort((a,b) => b.cnt - a.cnt);
+    const maxCnt   = sorted[0]?.cnt || 1;
+    const safeGroup = group.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+
+    html += `<div class="label-group-card" style="${isHidden ? 'opacity:0.45' : ''}">
+      <div class="label-group-title" style="display:flex;align-items:center;justify-content:space-between">
+        <span>${esc(group)} <span style="color:var(--muted);font-size:10px">(${sorted.length})</span></span>
+        <button onclick="toggleLabelGroup('${safeGroup}')" title="${isHidden ? 'Show' : 'Hide'} this scope"
+          style="background:none;border:none;cursor:pointer;font-size:13px;opacity:0.5;padding:0 2px;line-height:1">${isHidden ? '👁‍🗨' : '👁'}</button>
+      </div>
+      ${isHidden
+        ? '<div style="font-size:11px;color:var(--muted);padding:4px 0">Hidden — click 👁‍🗨 to show</div>'
+        : sorted.map(({lbl,val,cnt}) => {
+            const color = colorMap.get(lbl) || '#6B7280';
+            return `<div class="label-bar-row">
+              <div class="chip-dot" style="background:${color};width:8px;height:8px;border-radius:50%;flex-shrink:0"></div>
+              <div class="label-bar-name" title="${esc(lbl)}">${esc(val)}</div>
+              <div class="label-bar-track"><div class="label-bar-fill" style="width:${Math.round(cnt/maxCnt*100)}%;background:${color}66"></div></div>
+              <div class="label-bar-count">${cnt}</div>
+            </div>`;
+          }).join('')
+      }
+    </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('panel-labels').innerHTML = html || `<div class="empty"><div class="empty-icon">🏷</div><div class="empty-text">No labels in filtered issues</div></div>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// RISKS TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderRisks() {
+  const fi = S.filteredIssues.filter(i=>i.state!=='closed');
+  const blocked  = fi.filter(i=>i.isBlocked);
+  const noEst    = fi.filter(i=>!i.estimatePd);
+  const noAss    = fi.filter(i=>!(i.assignees||[]).length);
+  const highPri  = fi.filter(i=>(i.scopedMap['Priority']||[]).some(p=>p.toLowerCase().includes('high')));
+  const inReview = fi.filter(i=>i.inReview);
+
+  let html = '';
+
+  // KPIs
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+    ${kpiCard('Blocked', blocked.length, '🚫', blocked.length?'var(--red)':'var(--green)', 'open issues')}
+    ${kpiCard('No Estimate', noEst.length, '?', noEst.length?'var(--yellow)':'var(--green)', 'missing sizing')}
+    ${kpiCard('Unassigned', noAss.length, '', noAss.length?'var(--yellow)':'var(--green)', 'no owner')}
+    ${kpiCard('High Priority', highPri.length, '🔴', highPri.length?'var(--red)':'var(--muted)', 'open issues')}
+    ${kpiCard('In Review', inReview.length, '', 'var(--purple)', 'awaiting review')}
+  </div>`;
+
+  const section = (title, items, cls, icon, empty) => {
+    if (!items.length) return `<div style="margin-bottom:20px"><div class="section-header"><div class="section-title">${icon} ${title} <span style="color:var(--green);font-size:12px;font-weight:400">✓ none</span></div></div></div>`;
+    return `<div style="margin-bottom:24px">
+      <div class="section-header"><div class="section-title">${icon} ${title} <span style="color:var(--muted);font-size:12px;font-weight:400">(${items.length})</span></div></div>
+      <div class="risk-list">
+        ${items.map(i=>`<a href="${i.web_url}" target="_blank" class="risk-item ${cls}">
+          <div class="state-dot state-open"></div>
+          <span style="font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0">#${i.iid}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title)}</span>
+          ${(i.assignees||[]).length?`<span style="font-size:11px;color:var(--muted)">${esc((i.assignees[0].name||i.assignees[0].username).split(' ')[0])}</span>`:'<span style="font-size:11px;color:var(--yellow)">unassigned</span>'}
+          ${i.estimatePd?`<span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${i.estimatePd}pd</span>`:''}
+        </a>`).join('')}
+      </div></div>`;
+  };
+
+  html += section('Blocked Issues',      blocked,  '',     '🚫', 'No blocked issues');
+  html += section('High Priority Open',  highPri,  '',     '🔴', 'No high priority issues');
+  html += section('No Estimate',         noEst,    'warn', '?',  'All issues have estimates');
+  html += section('Unassigned',          noAss,    'warn', '👤', 'All issues assigned');
+  html += section('In Review',           inReview, 'info', '👁', 'Nothing in review');
+
+  document.getElementById('panel-risks').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MILESTONES TAB
+// ═══════════════════════════════════════════════════════════════════════
+function renderMilestones() {
+  const milestones = S.milestones || []; // already sorted, non-closed, from filteredIssues
+
+  // Map milestone id → issues (from filteredIssues)
+  const msIssues = new Map();
+  milestones.forEach(m => msIssues.set(m.id, []));
+  S.filteredIssues.forEach(i => {
+    if (!i.milestone) return;
+    if (msIssues.has(i.milestone.id)) msIssues.get(i.milestone.id).push(i);
+  });
+
+  const now = new Date();
+  const totalMs = milestones.length;
+  const withIssues = milestones.filter(m => msIssues.get(m.id)?.length > 0).length;
+
+  let html = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:24px">
+      ${kpiCard('Milestones', totalMs, '', 'var(--blue)', 'active')}
+      ${kpiCard('With Issues', withIssues, '', 'var(--green)', 'in filtered view')}
+      ${kpiCard('Upcoming', milestones.filter(m=>m.due_date && new Date(m.due_date)>now).length, '', 'var(--accent)', 'not yet due')}
+      ${kpiCard('Overdue', milestones.filter(m=>m.due_date && new Date(m.due_date)<now).length, '!', 'var(--red)', 'past due date')}
+    </div>
+    <div style="display:flex;flex-direction:column;gap:14px">`;
+
+  if (milestones.length === 0) {
+    html += `<div class="empty"><div class="empty-icon">🎯</div><div class="empty-text">No active milestones found</div></div>`;
+  }
+
+  milestones.forEach(m => {
+    const issues   = msIssues.get(m.id) || [];
+    const closed   = issues.filter(i=>i.state==='closed').length;
+    const open     = issues.length - closed;
+    const totalPd  = issues.reduce((s,i)=>s+(i.estimatePd||0),0);
+    const pct      = issues.length ? Math.round(closed/issues.length*100) : 0;
+    const dueDate  = m.due_date ? new Date(m.due_date) : null;
+    const isOver   = dueDate && dueDate < now;
+    const daysLeft = dueDate ? Math.ceil((dueDate-now)/(1000*60*60*24)) : null;
+    const pctColor = pct>=75?'var(--green)':pct>=40?'var(--yellow)':'var(--blue)';
+    const borderCol = isOver ? '#EF444444' : 'var(--border)';
+
+    let dueBadge = '';
+    if (!dueDate) {
+      dueBadge = `<span style="font-size:11px;color:var(--muted)">No due date</span>`;
+    } else if (isOver) {
+      dueBadge = `<span style="font-size:11px;color:var(--red);background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:10px">⚠ Overdue · ${m.due_date}</span>`;
+    } else if (daysLeft <= 14) {
+      dueBadge = `<span style="font-size:11px;color:var(--yellow);background:rgba(234,179,8,0.1);padding:2px 8px;border-radius:10px">⏳ ${daysLeft}d left · ${m.due_date}</span>`;
+    } else {
+      dueBadge = `<span style="font-size:11px;color:var(--muted)">📅 ${m.due_date} · ${daysLeft}d left</span>`;
+    }
+
+    html += `
+      <div style="background:var(--surface);border:1px solid ${borderCol};border-radius:14px;overflow:hidden">
+        <div style="padding:14px 18px;background:var(--surface2);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <a href="${m.web_url||'#'}" target="_blank" style="font-size:14px;font-weight:600;color:var(--text);text-decoration:none;flex:1" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text)'">${esc(m.title)}</a>
+          ${dueBadge}
+          <span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${issues.length} issues · ${totalPd||0}pd</span>
+        </div>
+        ${issues.length ? `
+        <div style="padding:10px 18px 4px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:4px">
+            <span>${closed} closed · ${open} open</span>
+            <span style="color:${pctColor};font-family:var(--mono)">${pct}%</span>
+          </div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${pctColor}"></div></div>
+        </div>
+        <div style="max-height:200px;overflow-y:auto">
+          ${issues.map(i=>`
+            <a href="${i.web_url}" target="_blank" class="issue-row" style="padding:7px 18px">
+              <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+              <span style="font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0">#${i.iid}</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(i.title)}</span>
+              ${i.isBlocked?'<span class="badge badge-blocked">Blocked</span>':''}
+              ${i.estimatePd?`<span class="est-label">${i.estimatePd}pd</span>`:''}
+            </a>`).join('')}
+        </div>` : `<div style="padding:12px 18px;font-size:12px;color:var(--muted)">No matching issues in this milestone</div>`}
+      </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('panel-milestones').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// VM15 REMEDIATION TAB
+// ═══════════════════════════════════════════════════════════════════════
+function setVM15ViewMode(mode) {
+  S.vm15ViewMode = mode;
+  renderVM15();
+}
+
+function severityBadges(sev) {
+  const chips = [];
+  if (sev.critical.length) chips.push(`<span class="badge" style="background:rgba(239,68,68,0.14);color:var(--red);border:1px solid rgba(239,68,68,0.3)">Critical ×${sev.critical.length}</span>`);
+  if (sev.major.length)    chips.push(`<span class="badge" style="background:rgba(249,115,22,0.14);color:#F97316;border:1px solid rgba(249,115,22,0.3)">Major ×${sev.major.length}</span>`);
+  if (sev.moderate.length) chips.push(`<span class="badge" style="background:rgba(234,179,8,0.14);color:var(--yellow);border:1px solid rgba(234,179,8,0.3)">Moderate ×${sev.moderate.length}</span>`);
+  return chips.join('');
+}
+
+function renderVM15() {
+  const vmIssues = S.filteredIssues.filter(i => i.vm15);
+
+  if (!vmIssues.length) {
+    document.getElementById('panel-vm15').innerHTML = `<div class="empty"><div class="empty-icon">🛡</div><div class="empty-text">No VM15 remediation issues match your filters</div></div>`;
+    return;
+  }
+
+  // ── Component roll-up ──
+  const compMap = new Map(); // component name → { libraries: [{issue, done}], doneCount }
+  vmIssues.forEach(i => {
+    (i.vm15.componentStatus.length ? i.vm15.componentStatus : [{ name: '(no components found in description)', done: i.state === 'closed' }])
+      .forEach(cs => {
+        if (!compMap.has(cs.name)) compMap.set(cs.name, { libraries: [] });
+        compMap.get(cs.name).libraries.push({ issue: i, done: cs.done });
+      });
+  });
+
+  const totalComponents = compMap.size;
+  const componentsFullyDone = [...compMap.values()].filter(c => c.libraries.every(l => l.done)).length;
+  const totalLibraries = vmIssues.length;
+  const librariesClosed = vmIssues.filter(i => i.state === 'closed').length;
+  const librariesAllComponentsDone = vmIssues.filter(i => i.vm15.allComponentsDone).length;
+  const overdue = vmIssues.filter(i => i.due_date && new Date(i.due_date) < new Date() && i.state !== 'closed').length;
+
+  let html = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px">
+      ${kpiCard('Libraries in Scope', totalLibraries, '', 'var(--blue)', `${librariesClosed} closed`)}
+      ${kpiCard('Components Tracked', totalComponents, '', 'var(--purple)', `${componentsFullyDone} fully remediated`)}
+      ${kpiCard('Libraries Fully Remediated', librariesAllComponentsDone, '', librariesAllComponentsDone===totalLibraries?'var(--green)':'var(--yellow)', 'all components done')}
+      ${kpiCard('Overdue', overdue, overdue?'!':'', overdue?'var(--red)':'var(--green)', 'past due date')}
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:18px">
+      <button onclick="setVM15ViewMode('component')" style="flex:0;white-space:nowrap;background:${S.vm15ViewMode==='component'?'var(--accent)':'var(--surface2)'};color:${S.vm15ViewMode==='component'?'#0C0D10':'var(--text)'};border:1px solid ${S.vm15ViewMode==='component'?'var(--accent)':'var(--border2)'};border-radius:8px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">By Component</button>
+      <button onclick="setVM15ViewMode('library')" style="flex:0;white-space:nowrap;background:${S.vm15ViewMode==='library'?'var(--accent)':'var(--surface2)'};color:${S.vm15ViewMode==='library'?'#0C0D10':'var(--text)'};border:1px solid ${S.vm15ViewMode==='library'?'var(--accent)':'var(--border2)'};border-radius:8px;padding:7px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">By Library</button>
+    </div>`;
+
+  if (S.vm15ViewMode === 'component') {
+    const sortedComps = [...compMap.entries()].sort((a,b) => {
+      const pctA = a[1].libraries.filter(l=>l.done).length / a[1].libraries.length;
+      const pctB = b[1].libraries.filter(l=>l.done).length / b[1].libraries.length;
+      return pctA - pctB; // least progress first
+    });
+
+    html += `<div style="display:flex;flex-direction:column;gap:12px">`;
+    sortedComps.forEach(([comp, data]) => {
+      const done  = data.libraries.filter(l => l.done).length;
+      const total = data.libraries.length;
+      const pct   = total ? Math.round(done/total*100) : 0;
+      const pctColor = pct===100?'var(--green)':pct>=50?'var(--yellow)':'var(--red)';
+      const id = 'vmc-' + comp.replace(/[^a-z0-9]/gi,'_');
+
+      html += `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+          <div style="padding:14px 18px;background:var(--surface2);display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="toggleGroup('${id}')">
+            <span class="collapse-icon">▾</span>
+            <span style="font-family:var(--mono);font-size:13px;font-weight:700;flex:1">${esc(comp)}</span>
+            <span style="font-size:11px;color:var(--muted)">${done}/${total} libraries remediated</span>
+            <span style="font-size:12px;font-weight:700;color:${pctColor};font-family:var(--mono)">${pct}%</span>
+          </div>
+          <div style="padding:8px 18px 0">
+            <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:${pctColor}"></div></div>
+          </div>
+          <div id="${id}" class="issue-list" style="padding-bottom:6px">
+            ${data.libraries.map(({issue, done}) => `
+              <a href="${issue.web_url}" target="_blank" class="issue-row">
+                <div class="state-dot ${done?'state-closed':'state-open'}"></div>
+                <span style="font-family:var(--mono);font-size:11px;color:var(--muted);flex-shrink:0">#${issue.iid}</span>
+                <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px">${esc(issue.title.replace(/^\[VM15\]\s*/i,''))}</span>
+                ${severityBadges(issue.vm15.severities)}
+                ${done ? '<span class="badge badge-done">Done</span>' : '<span class="badge" style="background:rgba(107,114,128,0.15);color:var(--muted);border:1px solid var(--border2)">Pending</span>'}
+              </a>`).join('')}
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+
+  } else {
+    // ── By library ──
+    html += `<div style="display:flex;flex-direction:column;gap:10px">`;
+    vmIssues.forEach(i => {
+      const comps = i.vm15.componentStatus;
+      const doneCount = comps.filter(c=>c.done).length;
+      html += `
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 18px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:${comps.length?'10px':'0'}">
+            <div class="state-dot ${i.state==='closed'?'state-closed':'state-open'}"></div>
+            <a href="${i.web_url}" target="_blank" style="font-size:13px;font-weight:600;color:var(--text);text-decoration:none;flex:1" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text)'">${esc(i.title)}</a>
+            ${severityBadges(i.vm15.severities)}
+            ${i.vm15.allComponentsDone ? '<span class="badge badge-done">All Components Done</span>' : `<span style="font-size:11px;color:var(--muted);font-family:var(--mono)">${doneCount}/${comps.length} components</span>`}
+          </div>
+          ${comps.length ? `
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${comps.map(c => `<span class="badge" style="background:${c.done?'rgba(34,197,94,0.14)':'rgba(107,114,128,0.15)'};color:${c.done?'var(--green)':'var(--muted)'};border:1px solid ${c.done?'rgba(34,197,94,0.3)':'var(--border2)'}">${c.done?'✓ ':''}${esc(c.name)}</span>`).join('')}
+          </div>` : `<div style="font-size:11px;color:var(--muted)">No components parsed from description — check the "VM15 Findings" section</div>`}
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  document.getElementById('panel-vm15').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showErr(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(()=>el.style.display='none', 5000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════
+loadSaved();
+</script>
+</body>
+</html>
