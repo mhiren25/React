@@ -1,0 +1,163 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="TA6wRSgHr5ZFTosbIYbM">
+    <mxGraphModel dx="1269" dy="562" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="2100" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="header-bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a237e;strokeColor=#0d47a1;strokeWidth=3;shadow=1;" value="" vertex="1">
+          <mxGeometry height="100" width="1720" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="header-title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 28px;&quot; color=&quot;#ffffff&quot;&gt;AI-Powered Order Entry Flow&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 14px;&quot; color=&quot;#e3f2fd&quot;&gt;Reducing order time from 5 minutes to 30 seconds | How AI Agents Streamline Client &amp;amp; Advisor Workflow&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="1720" x="40" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="col-header-step" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#37474f;strokeColor=#263238;strokeWidth=2;fontColor=#ffffff;shadow=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;STEP&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="140" x="40" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="col-header-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;fontColor=#ffffff;shadow=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;USER JOURNEY&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;What Client/Advisor Does&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="500" x="200" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="col-header-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2e7d32;strokeColor=#1b5e20;strokeWidth=2;fontColor=#ffffff;shadow=1;" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;AI AGENT &amp;amp; VALUE PROPOSITION&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Problem Solved &amp;amp; Business Benefit&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="1040" x="720" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="step1-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 1&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Request&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(0-2 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="step1-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;👤 Client Sends Request&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&quot;Buy 100 shares of AAPL&quot;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Via: Chat, Email, or Phone Call&lt;br&gt;Natural language input&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="step1-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🧠 INPUT PARSING AGENT&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Understands natural language (NLP)&lt;br&gt;• Extracts: action (buy), symbol (AAPL), quantity (100)&lt;br&gt;• Identifies intent and context&lt;br&gt;&lt;br&gt;&lt;b&gt;❌ Without AI:&lt;/b&gt; Manual form filling, dropdown selections (2-3 min)&lt;br&gt;&lt;b&gt;✅ With AI:&lt;/b&gt; Instant comprehension from casual language&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow1" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="390" as="sourcePoint" />
+            <mxPoint x="450" y="420" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step2-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 2&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Understand&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(1-2 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="step2-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🎯 System Analyzes Request&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Understanding intent &amp;amp; context&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Identifies client profile&lt;br&gt;• Detects urgency level&lt;br&gt;• Links to active session&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="step2-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🧠 EMOTION ANALYSIS + CONTACT ID AGENTS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• &lt;b&gt;Emotion Agent:&lt;/b&gt; Detects urgency, stress, confidence levels&lt;br&gt;• &lt;b&gt;Contact ID Agent:&lt;/b&gt; Links request to client profile &amp;amp; preferences&lt;br&gt;• Retrieves client investment goals, risk tolerance&lt;br&gt;&lt;br&gt;&lt;b&gt;❌ Without AI:&lt;/b&gt; Generic response, no context awareness&lt;br&gt;&lt;b&gt;✅ With AI:&lt;/b&gt; Personalized handling based on client profile &amp;amp; emotional state&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow2" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="550" as="sourcePoint" />
+            <mxPoint x="450" y="580" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step3-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 3&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Resolve&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(1-3 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="step3-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🔍 Resolve Ambiguities&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&quot;Which AAPL?&quot;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Which exchange? (NASDAQ)&lt;br&gt;• Which account? (Main portfolio)&lt;br&gt;• Any restrictions? (Check holdings)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="step3-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🧠 LISTING RESOLVER + FEEDBACK AGENTS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• &lt;b&gt;Listing Resolver:&lt;/b&gt; Auto-resolves security (AAPL = Apple Inc., NASDAQ)&lt;br&gt;• Checks client account preferences, default exchange&lt;br&gt;• &lt;b&gt;Feedback Agent:&lt;/b&gt; Identifies missing info, asks clarifying questions if needed&lt;br&gt;&lt;br&gt;&lt;b&gt;❌ Without AI:&lt;/b&gt; 3-4 back-and-forth clarification questions (1-2 min)&lt;br&gt;&lt;b&gt;✅ With AI:&lt;/b&gt; Auto-resolved using client preferences &amp;amp; smart defaults&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow3" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="710" as="sourcePoint" />
+            <mxPoint x="450" y="740" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step4-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 4&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Recommend&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(2-4 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="step4-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;💡 Get Strategic Advice&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&quot;Is this a good fit?&quot;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Portfolio impact analysis&lt;br&gt;• Risk assessment&lt;br&gt;• Personalized recommendation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="step4-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🧠 STRATEGY SUGGESTION + PERSONAL ADVISE AGENTS&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• &lt;b&gt;Strategy Agent:&lt;/b&gt; Analyzes portfolio fit, diversification impact, risk exposure&lt;br&gt;• &lt;b&gt;Personal Advise:&lt;/b&gt; Customized suggestions based on client goals, CIO views&lt;br&gt;• Checks against investment policy, alerts if out-of-bounds&lt;br&gt;&lt;br&gt;&lt;b&gt;❌ Without AI:&lt;/b&gt; Wait for human advisor availability (hours/days)&lt;br&gt;&lt;b&gt;✅ With AI:&lt;/b&gt; Instant expert-level advice, 24/7 availability&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="740" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow4" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="870" as="sourcePoint" />
+            <mxPoint x="450" y="900" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step5-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 5&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Oversight&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(optional)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="step5-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;👨‍💼 Advisor Reviews (if needed)&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Multi-client oversight&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Exception alerts only&lt;br&gt;• Cross-client portfolio view&lt;br&gt;• Manual intervention queue&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="step5-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;👨‍💼 ADVISOR OVERSIGHT DASHBOARD&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Real-time multi-client portfolio analytics&lt;br&gt;• Exception-based alerts (only flags unusual requests)&lt;br&gt;• Performance tracking across all managed clients&lt;br&gt;&lt;br&gt;&lt;b&gt;✅ Benefit:&lt;/b&gt; Advisor can manage 3x more clients efficiently&lt;br&gt;&lt;b&gt;✅ Benefit:&lt;/b&gt; Focus on high-value interactions, not routine tasks&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow5" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="1030" as="sourcePoint" />
+            <mxPoint x="450" y="1060" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step6-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 6&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Confirm&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(5-30 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="step6-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f57f17;strokeWidth=3;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;dashed=1;dashPattern=5 5;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;⏸️ Human Confirms Order&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;&quot;Buy 100 AAPL @ $150 ✓&quot;&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Client or Advisor final approval&lt;br&gt;• Review AI recommendation&lt;br&gt;• Click to confirm&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="step6-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f57f17;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🔐 HUMAN-IN-THE-LOOP CHECKPOINT&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Client/Advisor maintains final control over all decisions&lt;br&gt;• Clear summary of AI analysis and recommendation&lt;br&gt;• One-click approval or modify-and-approve workflow&lt;br&gt;&lt;br&gt;&lt;b&gt;✅ Benefit:&lt;/b&gt; Regulatory compliance (human oversight required)&lt;br&gt;&lt;b&gt;✅ Benefit:&lt;/b&gt; Trust &amp;amp; transparency - humans stay in control&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow6" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="1190" as="sourcePoint" />
+            <mxPoint x="450" y="1220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step7-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 7&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Validate&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(1 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="1220" as="geometry" />
+        </mxCell>
+        <mxCell id="step7-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🔍 Pre-Execution Validation&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Automated compliance checks&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Regulatory rules verification&lt;br&gt;• Balance &amp;amp; limit checks&lt;br&gt;• Listing eligibility&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="1220" as="geometry" />
+        </mxCell>
+        <mxCell id="step7-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;🔍 VALIDATION ENGINE&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Automated regulatory compliance checks (SEC, FINRA rules)&lt;br&gt;• Account balance verification &amp;amp; trading limit enforcement&lt;br&gt;• Security listing eligibility &amp;amp; market hour validation&lt;br&gt;&lt;br&gt;&lt;b&gt;❌ Without AI:&lt;/b&gt; Manual verification, potential for human error&lt;br&gt;&lt;b&gt;✅ With AI:&lt;/b&gt; Instant, 100% accurate compliance validation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="1220" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow7" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;html=1;fillColor=#0277bd;strokeColor=#01579b;strokeWidth=2;width=15;endSize=6;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="450" y="1350" as="sourcePoint" />
+            <mxPoint x="450" y="1380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="step8-num" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;STEP 8&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Execute&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;(1 sec)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="140" x="40" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="step8-journey" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#0277bd;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;⚡ Execute Order&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;Route to market &amp;amp; confirm&lt;/font&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• Smart order routing&lt;br&gt;• Real-time execution&lt;br&gt;• Confirmation sent to client&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="500" x="200" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="step8-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#6a1b9a;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;⚡ ORDER EXECUTION ENGINE + AUDIT LOG&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• &lt;b&gt;Execution Engine:&lt;/b&gt; Smart routing to booking center, best execution&lt;br&gt;• Real-time confirmation tracking and client notification&lt;br&gt;• &lt;b&gt;Audit Log:&lt;/b&gt; Complete audit trail for regulatory compliance&lt;br&gt;&lt;br&gt;&lt;b&gt;✅ Benefit:&lt;/b&gt; Full transparency and traceability for all decisions&lt;br&gt;&lt;b&gt;✅ Benefit:&lt;/b&gt; Regulatory-ready reporting and compliance documentation&lt;/font&gt;" vertex="1">
+          <mxGeometry height="120" width="1040" x="720" y="1380" as="geometry" />
+        </mxCell>
+        <mxCell id="success-indicator" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c8e6c9;strokeColor=#2e7d32;strokeWidth=3;shadow=1;align=center;verticalAlign=middle;" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px; color=#2e7d32;&quot;&gt;✅ ORDER CONFIRMED&lt;/font&gt;&lt;/b&gt;" vertex="1">
+          <mxGeometry height="60" width="500" x="200" y="1530" as="geometry" />
+        </mxCell>
+        <mxCell id="footer-bg" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a237e;strokeColor=#0d47a1;strokeWidth=3;shadow=1;" value="" vertex="1">
+          <mxGeometry height="120" width="1720" x="40" y="1630" as="geometry" />
+        </mxCell>
+        <mxCell id="footer-metrics" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" value="&lt;b&gt;&lt;font style=&quot;font-size: 22px;&quot; color=&quot;#ffffff&quot;&gt;RESULTS &amp;amp; BUSINESS IMPACT&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 14px;&quot; color=&quot;#e3f2fd&quot;&gt;⏱️ &lt;b&gt;Traditional Process:&lt;/b&gt; 5-10 minutes per order  |  &lt;b&gt;With AI Agents:&lt;/b&gt; 30-60 seconds  |  &lt;b&gt;⚡ 10x FASTER&lt;/b&gt;&lt;br&gt;&lt;br&gt;📈 &lt;b&gt;Client Satisfaction:&lt;/b&gt; ↑ 40%  |  &lt;b&gt;Advisor Efficiency:&lt;/b&gt; ↑ 300% (manage 3x clients)  |  &lt;b&gt;Error Rate:&lt;/b&gt; ↓ 90%&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="1720" x="40" y="1650" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#757575;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;LEGEND&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;🧠 = AI Agent&lt;br&gt;👤 = Client Action&lt;br&gt;👨‍💼 = Advisor Action&lt;br&gt;⏸️ = Human Checkpoint&lt;br&gt;✅ = Benefit/Solution&lt;br&gt;❌ = Problem (Without AI)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="280" x="40" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="tech-stack" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;TECHNOLOGY STACK&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;• NLP: Natural Language Processing&lt;br&gt;• ML: Machine Learning Models&lt;br&gt;• React: User Interface&lt;br&gt;• Real-time APIs: Market Data&lt;br&gt;• Compliance Engine: Regulatory Rules&lt;br&gt;• Audit Trail: Immutable Logging&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="320" x="340" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="key-benefits" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;KEY BENEFITS SUMMARY&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;✅ &lt;b&gt;Speed:&lt;/b&gt; 10x faster order processing&lt;br&gt;✅ &lt;b&gt;Accuracy:&lt;/b&gt; 90% reduction in errors&lt;br&gt;✅ &lt;b&gt;Compliance:&lt;/b&gt; 100% regulatory coverage&lt;br&gt;✅ &lt;b&gt;Scale:&lt;/b&gt; Advisors handle 3x clients&lt;br&gt;✅ &lt;b&gt;24/7:&lt;/b&gt; Always-on intelligent service&lt;br&gt;✅ &lt;b&gt;Control:&lt;/b&gt; Human final decision authority&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="360" x="680" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="next-steps" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff3e0;strokeColor=#e65100;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;IMPLEMENTATION PHASES&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;&lt;b&gt;Phase 1:&lt;/b&gt; Input Parsing + Emotion Analysis&lt;br&gt;&lt;b&gt;Phase 2:&lt;/b&gt; Listing Resolver + Feedback&lt;br&gt;&lt;b&gt;Phase 3:&lt;/b&gt; Strategy + Personal Advise&lt;br&gt;&lt;b&gt;Phase 4:&lt;/b&gt; Advisor Oversight Dashboard&lt;br&gt;&lt;b&gt;Phase 5:&lt;/b&gt; Full Integration + Optimization&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="400" x="1060" y="1800" as="geometry" />
+        </mxCell>
+        <mxCell id="contact-info" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#757575;strokeWidth=2;shadow=1;align=left;verticalAlign=top;spacingLeft=15;spacingTop=10;" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;DOCUMENT INFO&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;Version: 1.0&lt;br&gt;Date: January 2026&lt;br&gt;Purpose: Stakeholder Presentation&lt;br&gt;Classification: Internal Use&lt;/font&gt;" vertex="1">
+          <mxGeometry height="180" width="280" x="1480" y="1800" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
